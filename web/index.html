@@ -15,72 +15,71 @@
     /* ── Header ──────────────────────────────────────────────────────────── */
     #header {
       position: absolute; top: 0; left: 0; right: 0;
-      padding: 14px 24px 20px;
-      background: linear-gradient(to bottom, rgba(5,5,16,0.96) 60%, transparent);
+      padding: 16px 28px 22px;
+      background: linear-gradient(to bottom, rgba(5,5,16,0.97) 60%, transparent);
       display: flex; justify-content: space-between; align-items: flex-start;
       pointer-events: none;
     }
     #title {
-      font-size: 22px; letter-spacing: 0.25em;
-      color: #00d4ff; text-shadow: 0 0 14px #00d4ff88;
+      font-size: 28px; letter-spacing: 0.28em;
+      color: #00d4ff; text-shadow: 0 0 18px #00d4ffaa;
     }
     #subtitle {
-      font-size: 10px; letter-spacing: 0.15em;
-      color: rgba(0,212,255,0.45); margin-top: 3px;
+      font-size: 12px; letter-spacing: 0.15em;
+      color: rgba(0,212,255,0.5); margin-top: 4px;
     }
     #drop-hint {
-      font-size: 10px; letter-spacing: 0.12em;
-      color: rgba(255,255,255,0.25);
-      align-self: center;
+      font-size: 11px; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.28); align-self: center;
     }
 
     /* ── Phase badge ─────────────────────────────────────────────────────── */
     #phase-badge {
-      position: absolute; top: 72px; left: 24px;
-      padding: 8px 16px;
-      background: rgba(5,5,16,0.88);
-      border: 1px solid rgba(0,255,136,0.35);
-      border-radius: 3px;
-      display: flex; align-items: center; gap: 10px;
+      position: absolute; top: 82px; left: 28px;
+      padding: 10px 20px;
+      background: rgba(5,5,16,0.9);
+      border: 1px solid rgba(0,255,136,0.4);
+      border-radius: 4px;
+      display: flex; align-items: center; gap: 12px;
       transition: border-color 0.3s;
     }
     #phase-dot {
-      width: 11px; height: 11px; border-radius: 50%;
-      background: #00ff88; box-shadow: 0 0 9px #00ff88;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: #00ff88; box-shadow: 0 0 12px #00ff88;
       flex-shrink: 0; transition: background 0.3s, box-shadow 0.3s;
     }
     #phase-text {
-      font-size: 12px; letter-spacing: 0.12em; color: #00ff88;
+      font-size: 15px; letter-spacing: 0.14em; color: #00ff88;
       transition: color 0.3s;
     }
-    #phase-badge.danger { border-color: rgba(255,32,32,0.5); }
-    #phase-badge.danger #phase-dot { background: #ff2020; box-shadow: 0 0 9px #ff2020; }
+    #phase-badge.danger { border-color: rgba(255,32,32,0.55); }
+    #phase-badge.danger #phase-dot { background: #ff2020; box-shadow: 0 0 12px #ff2020; }
     #phase-badge.danger #phase-text { color: #ff5050; }
 
     /* ── Event log ───────────────────────────────────────────────────────── */
     #log-panel {
-      position: absolute; top: 72px; right: 24px;
-      width: 320px;
-      background: rgba(5,5,16,0.88);
-      border: 1px solid rgba(0,212,255,0.2);
-      border-radius: 3px;
+      position: absolute; top: 82px; right: 28px;
+      width: 360px;
+      background: rgba(5,5,16,0.9);
+      border: 1px solid rgba(0,212,255,0.22);
+      border-radius: 4px;
       display: flex; flex-direction: column;
-      max-height: calc(100vh - 160px);
+      max-height: calc(100vh - 170px);
     }
     #log-header {
-      padding: 7px 12px; font-size: 10px; letter-spacing: 0.18em;
+      padding: 8px 14px; font-size: 11px; letter-spacing: 0.2em;
       color: rgba(0,212,255,0.5);
       border-bottom: 1px solid rgba(0,212,255,0.15);
       flex-shrink: 0;
     }
     #event-log {
-      padding: 6px; overflow-y: auto; flex: 1;
+      padding: 8px; overflow-y: auto; flex: 1;
     }
     #event-log::-webkit-scrollbar { width: 4px; }
     #event-log::-webkit-scrollbar-track { background: transparent; }
     #event-log::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.25); border-radius: 2px; }
     .log-entry {
-      font-size: 10px; padding: 4px 8px; margin: 2px 0;
+      font-size: 12px; padding: 5px 8px; margin: 2px 0;
       border-left: 2px solid; border-radius: 1px;
       line-height: 1.5; letter-spacing: 0.02em;
     }
@@ -88,69 +87,94 @@
     .log-entry.danger  { color: #ff7070; border-color: #ff2020; background: rgba(255,32,32,0.07); }
     .log-entry.proposal{ color: #ffcc66; border-color: #ffaa00; background: rgba(255,170,0,0.07); }
     .log-entry.maneuver{ color: #ffa060; border-color: #ff6600; background: rgba(255,100,0,0.07); }
-    .log-entry.info    { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
+    .log-entry.info    { color: rgba(255,255,255,0.45); border-color: rgba(255,255,255,0.15); }
 
     /* ── Bottom controls ─────────────────────────────────────────────────── */
     #controls {
       position: absolute; bottom: 0; left: 0; right: 0;
-      padding: 14px 24px 18px;
-      background: linear-gradient(to top, rgba(5,5,16,0.96) 60%, transparent);
-      display: flex; align-items: center; gap: 14px;
+      padding: 16px 28px 20px;
+      background: linear-gradient(to top, rgba(5,5,16,0.97) 60%, transparent);
+      display: flex; align-items: center; gap: 16px;
     }
     #play-btn {
       background: none;
       border: 1px solid #00d4ff;
       color: #00d4ff;
-      font-size: 18px; line-height: 1;
-      width: 40px; height: 40px;
-      cursor: pointer; border-radius: 3px;
+      font-size: 20px; line-height: 1;
+      width: 46px; height: 46px;
+      cursor: pointer; border-radius: 4px;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0; transition: background 0.15s;
     }
     #play-btn:hover { background: rgba(0,212,255,0.14); }
+
+    /* Scrubber wrapper holds the range input + event tick marks */
+    #scrubber-wrap {
+      flex: 1; position: relative;
+      display: flex; align-items: center;
+      height: 24px;
+    }
     #scrubber {
-      flex: 1; -webkit-appearance: none;
+      width: 100%; -webkit-appearance: none;
       height: 3px; background: rgba(0,212,255,0.18);
       border-radius: 2px; outline: none; cursor: pointer;
+      position: relative; z-index: 2;
     }
     #scrubber::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 13px; height: 13px;
+      width: 14px; height: 14px;
       background: #00d4ff; border-radius: 50%;
-      box-shadow: 0 0 7px #00d4ff;
+      box-shadow: 0 0 8px #00d4ff;
+      position: relative; z-index: 3;
     }
+    /* Event tick marks overlay */
+    #event-marks {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none; z-index: 1;
+    }
+    .ev-mark {
+      position: absolute; top: 50%;
+      width: 8px; height: 8px; border-radius: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.85;
+    }
+    .ev-mark.danger   { background: #ff2020; box-shadow: 0 0 5px #ff2020; }
+    .ev-mark.proposal { background: #ffaa00; box-shadow: 0 0 5px #ffaa00; }
+    .ev-mark.maneuver { background: #ff6600; box-shadow: 0 0 5px #ff6600; }
+    .ev-mark.safe     { background: #00ff88; box-shadow: 0 0 5px #00ff88; }
+
     #time-display {
-      font-size: 12px; color: #00d4ff;
-      letter-spacing: 0.06em; min-width: 72px; text-align: right;
+      font-size: 14px; color: #00d4ff;
+      letter-spacing: 0.08em; min-width: 80px; text-align: right;
     }
     #speed-select {
-      background: rgba(0,15,30,0.85);
-      border: 1px solid rgba(0,212,255,0.3);
-      color: #00d4ff; padding: 5px 8px;
-      font-family: inherit; font-size: 12px;
-      cursor: pointer; border-radius: 3px; flex-shrink: 0;
+      background: rgba(0,15,30,0.9);
+      border: 1px solid rgba(0,212,255,0.35);
+      color: #00d4ff; padding: 6px 10px;
+      font-family: inherit; font-size: 13px;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
     }
 
-    /* ── CSS2D labels ────────────────────────────────────────────────────── */
+    /* ── CSS2D labels (projector-sized) ─────────────────────────────────── */
     .sat-label {
-      color: rgba(0,212,255,0.75);
+      color: rgba(0,212,255,0.85);
       font-family: 'Courier New', monospace;
-      font-size: 10px; letter-spacing: 0.06em;
-      text-shadow: 0 0 5px rgba(0,212,255,0.8);
+      font-size: 13px; letter-spacing: 0.07em;
+      text-shadow: 0 0 7px rgba(0,212,255,0.9);
       white-space: nowrap; pointer-events: none;
     }
     .conj-label {
       color: #ff4040;
       font-family: 'Courier New', monospace;
-      font-size: 13px; font-weight: bold; letter-spacing: 0.1em;
-      text-shadow: 0 0 10px #ff2020, 0 0 22px #ff202066;
+      font-size: 18px; font-weight: bold; letter-spacing: 0.1em;
+      text-shadow: 0 0 12px #ff2020, 0 0 28px #ff202055;
       white-space: nowrap; pointer-events: none;
     }
     .resolved-label {
       color: #00ff88;
       font-family: 'Courier New', monospace;
-      font-size: 13px; font-weight: bold; letter-spacing: 0.1em;
-      text-shadow: 0 0 10px #00ff88, 0 0 22px #00ff8866;
+      font-size: 16px; font-weight: bold;
+      text-shadow: 0 0 10px #00ff88, 0 0 24px #00ff8855;
       white-space: nowrap; pointer-events: none;
     }
   </style>
@@ -162,7 +186,7 @@
   <div id="header">
     <div>
       <div id="title">RIGHT OF WAY</div>
-      <div id="subtitle" id="scenario-name">Autonomous Orbital Negotiation</div>
+      <div id="subtitle">Autonomous Orbital Negotiation</div>
     </div>
     <div id="drop-hint">DROP TIMELINE JSON TO REPLACE FIXTURE</div>
   </div>
@@ -179,8 +203,11 @@
 
   <div id="controls">
     <button id="play-btn">▶</button>
-    <input type="range" id="scrubber" min="0" max="1000" value="0" step="1" />
-    <div id="time-display">T+0s</div>
+    <div id="scrubber-wrap">
+      <div id="event-marks"></div>
+      <input type="range" id="scrubber" min="0" max="1000" value="0" step="1" />
+    </div>
+    <div id="time-display">T+00:00</div>
     <select id="speed-select">
       <option value="1">1×</option>
       <option value="5">5×</option>

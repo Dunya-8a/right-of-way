@@ -11,37 +11,130 @@ interface Timeline { meta: Record<string, unknown>; frames: Frame[]; events: TLE
 
 // ── Scene constants ───────────────────────────────────────────────────────────
 const EARTH_KM = 6371;
-const ORBIT_KM = 6878;           // normalisation reference
-const S = 1 / ORBIT_KM;          // km → scene units; LEO orbit ≈ 1.0 units
-const EARTH_R = EARTH_KM * S;    // ~0.926
+const ORBIT_KM = 6878;
+const S = 1 / ORBIT_KM;         // km → scene units; LEO ≈ 1 unit radius
+const EARTH_R = EARTH_KM * S;   // ~0.926
 
 const COL = {
   BG:       0x050510,
-  EARTH:    0x0a1a3a,
-  GRID:     0x0d2a5c,
   NORMAL:   0x00d4ff,
   DANGER:   0xff2020,
   SAFE:     0x00ff88,
   PROPOSAL: 0xffaa00,
   DEBRIS:   0x888888,
   TRAIL:    0x003355,
+  RING:     0x00284a,
 };
 
-const TRAIL_MAX = 40;  // history points per satellite
+const TRAIL_MAX = 40;
+
+// ── Procedural Earth texture ──────────────────────────────────────────────────
+function makeEarthTexture(): THREE.CanvasTexture {
+  const W = 1024, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d')!;
+
+  // Ocean gradient
+  const ocean = ctx.createLinearGradient(0, 0, 0, H);
+  ocean.addColorStop(0,   '#0b2240');
+  ocean.addColorStop(0.5, '#0d2d55');
+  ocean.addColorStop(1,   '#0b2240');
+  ctx.fillStyle = ocean;
+  ctx.fillRect(0, 0, W, H);
+
+  // Helper: draw a rough land ellipse
+  function land(cx: number, cy: number, rx: number, ry: number, rot = 0) {
+    ctx.save();
+    ctx.translate(cx * W, cy * H);
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx * W, ry * H, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Landmasses (equirectangular, rough but recognisable) ──
+  // North America
+  ctx.fillStyle = '#1e4020';
+  land(0.14, 0.28, 0.10, 0.22);
+  land(0.10, 0.22, 0.05, 0.12);   // Alaska bump
+  land(0.20, 0.40, 0.06, 0.10);   // Mexico/Central
+  // Greenland
+  ctx.fillStyle = '#c8daea';
+  land(0.28, 0.12, 0.04, 0.08);
+  // South America
+  ctx.fillStyle = '#1e4020';
+  land(0.18, 0.60, 0.07, 0.20);
+  // Europe
+  land(0.47, 0.20, 0.05, 0.14);
+  // Africa
+  land(0.48, 0.52, 0.07, 0.24);
+  land(0.50, 0.30, 0.04, 0.10);   // North Africa
+  // Arabian Peninsula — desert colour
+  ctx.fillStyle = '#4a3a18';
+  land(0.57, 0.35, 0.04, 0.10);
+  // India
+  ctx.fillStyle = '#1e4020';
+  land(0.63, 0.44, 0.03, 0.10);
+  // Asia (main body)
+  land(0.69, 0.22, 0.20, 0.26);
+  // SE Asia + Indonesia
+  land(0.76, 0.42, 0.08, 0.10);
+  land(0.82, 0.50, 0.05, 0.06);
+  // Australia
+  land(0.82, 0.63, 0.06, 0.09);
+  // Japan / islands
+  land(0.90, 0.28, 0.02, 0.06, 0.3);
+
+  // ── Desert overlay (Sahara / Central Asia) ────────────────
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = '#5a4222';
+  land(0.47, 0.33, 0.09, 0.08);   // Sahara
+  land(0.66, 0.28, 0.12, 0.10);   // Central Asia steppes
+  ctx.globalAlpha = 1.0;
+
+  // ── Polar ice caps ────────────────────────────────────────
+  const arcticGrad = ctx.createLinearGradient(0, 0, 0, 0.12 * H);
+  arcticGrad.addColorStop(0, '#d8e8f8');
+  arcticGrad.addColorStop(1, 'rgba(200,220,240,0)');
+  ctx.fillStyle = arcticGrad;
+  ctx.fillRect(0, 0, W, 0.12 * H);
+
+  const antarcticGrad = ctx.createLinearGradient(0, 0.88 * H, 0, H);
+  antarcticGrad.addColorStop(0, 'rgba(200,220,240,0)');
+  antarcticGrad.addColorStop(1, '#d8e8f8');
+  ctx.fillStyle = antarcticGrad;
+  ctx.fillRect(0, 0.88 * H, W, 0.12 * H);
+
+  // ── Subtle atmospheric haze bands ────────────────────────
+  ctx.globalAlpha = 0.06;
+  for (let i = 0; i < 8; i++) {
+    const y = (i / 8) * H;
+    ctx.fillStyle = i % 2 === 0 ? '#1a4060' : '#0a1a30';
+    ctx.fillRect(0, y, W, H / 8);
+  }
+  ctx.globalAlpha = 1.0;
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
-const canvasEl   = document.getElementById('canvas')    as HTMLCanvasElement;
-const labelRoot  = document.getElementById('label-root')!;
-const playBtn    = document.getElementById('play-btn')!;
-const scrubber   = document.getElementById('scrubber')  as HTMLInputElement;
-const timeDsp    = document.getElementById('time-display')!;
-const speedSel   = document.getElementById('speed-select') as HTMLSelectElement;
-const phaseBadge = document.getElementById('phase-badge')!;
-const phaseText  = document.getElementById('phase-text')!;
-const eventLog   = document.getElementById('event-log')!;
-const subtitleEl = document.getElementById('subtitle')!;
+const canvasEl    = document.getElementById('canvas')     as HTMLCanvasElement;
+const labelRoot   = document.getElementById('label-root')!;
+const playBtn     = document.getElementById('play-btn')!;
+const scrubber    = document.getElementById('scrubber')   as HTMLInputElement;
+const timeDsp     = document.getElementById('time-display')!;
+const speedSel    = document.getElementById('speed-select') as HTMLSelectElement;
+const phaseBadge  = document.getElementById('phase-badge')!;
+const phaseText   = document.getElementById('phase-text')!;
+const eventLog    = document.getElementById('event-log')!;
+const subtitleEl  = document.getElementById('subtitle')!;
+const eventMarks  = document.getElementById('event-marks')!;
 
-// ── Renderer + scene setup ────────────────────────────────────────────────────
+// ── Renderer + scene ──────────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -53,135 +146,218 @@ labelRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer
 labelRoot.appendChild(labelRenderer.domElement);
 
 const scene  = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.005, 200);
-camera.position.set(0, 0.6, 3.0);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.005, 200);
+camera.position.set(0, 0.7, 3.2);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
-controls.minDistance = 1.1;
+controls.minDistance = 1.15;
 controls.maxDistance = 20;
 
 // Lights
-scene.add(new THREE.AmbientLight(0x334455, 0.9));
-const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-sun.position.set(6, 4, 5);
+scene.add(new THREE.AmbientLight(0x334466, 0.7));
+const sun = new THREE.DirectionalLight(0xfff5ee, 1.3);
+sun.position.set(8, 5, 6);
 scene.add(sun);
+// Rim light from back
+const rim = new THREE.DirectionalLight(0x0044aa, 0.35);
+rim.position.set(-5, -2, -4);
+scene.add(rim);
 
 // Stars
 {
   const verts: number[] = [];
-  for (let i = 0; i < 2500; i++) {
-    const r = 60 + Math.random() * 60;
+  for (let i = 0; i < 3000; i++) {
+    const r = 70 + Math.random() * 60;
     const th = Math.random() * Math.PI * 2;
     const ph = Math.acos(2 * Math.random() - 1);
     verts.push(r * Math.sin(ph) * Math.cos(th), r * Math.sin(ph) * Math.sin(th), r * Math.cos(ph));
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.06, sizeAttenuation: false })));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.05, sizeAttenuation: false })));
 }
 
-// Earth body
+// Earth — procedural texture
+const earthTex = makeEarthTexture();
 const earth = new THREE.Mesh(
   new THREE.SphereGeometry(EARTH_R, 64, 32),
-  new THREE.MeshPhongMaterial({ color: COL.EARTH, emissive: 0x061228, emissiveIntensity: 0.4, shininess: 12 }),
+  new THREE.MeshPhongMaterial({
+    map: earthTex,
+    specular: new THREE.Color(0x113355),
+    shininess: 18,
+    emissive: new THREE.Color(0x060e1a),
+    emissiveIntensity: 0.25,
+  }),
 );
 scene.add(earth);
 
-// Grid lines on Earth
+// City lights (faint emissive sphere, only on night side)
+const nightTex = (() => {
+  const W = 512, H = 256;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#ffffaa';
+  // Scatter of city dots on major urban regions
+  const cities = [
+    [0.10,0.25],[0.13,0.27],[0.15,0.30],[0.23,0.24], // N America
+    [0.47,0.19],[0.49,0.20],[0.50,0.22],[0.48,0.23], // Europe
+    [0.61,0.27],[0.65,0.25],[0.70,0.28],[0.72,0.30], // Asia
+    [0.63,0.32],[0.74,0.38],[0.90,0.30],              // more Asia
+  ];
+  cities.forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x * W, y * H, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
 scene.add(new THREE.Mesh(
-  new THREE.SphereGeometry(EARTH_R * 1.002, 24, 12),
-  new THREE.MeshBasicMaterial({ color: COL.GRID, wireframe: true, transparent: true, opacity: 0.12 }),
+  new THREE.SphereGeometry(EARTH_R * 1.001, 64, 32),
+  new THREE.MeshBasicMaterial({ map: nightTex, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending }),
 ));
 
-// Atmosphere glow (backside sphere)
+// Atmosphere outer glow
 scene.add(new THREE.Mesh(
-  new THREE.SphereGeometry(EARTH_R * 1.05, 48, 24),
-  new THREE.MeshPhongMaterial({ color: 0x0d3a6e, transparent: true, opacity: 0.12, side: THREE.BackSide }),
+  new THREE.SphereGeometry(EARTH_R * 1.06, 48, 24),
+  new THREE.MeshPhongMaterial({ color: 0x0d3a6e, transparent: true, opacity: 0.10, side: THREE.BackSide }),
 ));
+
+// ── Orbit ring helper ─────────────────────────────────────────────────────────
+function makeOrbitRing(id: string, frames: Frame[]): THREE.Line | null {
+  // Need two non-collinear position vectors to define the orbital plane
+  let v0: THREE.Vector3 | null = null, v1: THREE.Vector3 | null = null;
+  for (let i = 0; i < frames.length - 1; i++) {
+    const o0 = frames[i].objects.find(o => o.id === id);
+    const o1 = frames[i + 1].objects.find(o => o.id === id);
+    if (!o0 || !o1) continue;
+    const a = new THREE.Vector3(...o0.r);
+    const b = new THREE.Vector3(...o1.r);
+    if (a.lengthSq() < 100 || b.lengthSq() < 100) continue;
+    if (new THREE.Vector3().crossVectors(a, b).lengthSq() > 1000) {
+      v0 = a.multiplyScalar(S);
+      v1 = b.multiplyScalar(S);
+      break;
+    }
+  }
+  if (!v0 || !v1) return null;
+
+  const normal = new THREE.Vector3().crossVectors(v0, v1).normalize();
+  const radius = v0.length();
+
+  const N = 160;
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= N; i++) {
+    const theta = (i / N) * Math.PI * 2;
+    pts.push(new THREE.Vector3(radius * Math.cos(theta), radius * Math.sin(theta), 0));
+  }
+
+  const geom = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat  = new THREE.LineBasicMaterial({ color: COL.RING, transparent: true, opacity: 0.4 });
+  const ring = new THREE.Line(geom, mat);
+
+  // Rotate the circle from the XY plane to the satellite's orbital plane
+  const zAxis = new THREE.Vector3(0, 0, 1);
+  if (Math.abs(normal.dot(zAxis)) < 0.9999) {
+    ring.setRotationFromQuaternion(
+      new THREE.Quaternion().setFromUnitVectors(zAxis, normal),
+    );
+  }
+  return ring;
+}
 
 // ── Satellite objects ─────────────────────────────────────────────────────────
 interface SatObj {
-  mesh:       THREE.Mesh;
-  glow:       THREE.Mesh;
-  trailLine:  THREE.Line;
-  trailBuf:   THREE.BufferAttribute;
-  trailPts:   THREE.Vector3[];
-  nameLabel:  CSS2DObject;
+  mesh:      THREE.Mesh;
+  glow:      THREE.Mesh;
+  trailLine: THREE.Line;
+  trailBuf:  THREE.BufferAttribute;
+  trailPts:  THREE.Vector3[];
+  nameLabel: CSS2DObject;
+  orbitRing: THREE.Line | null;
 }
 
 const sats = new Map<string, SatObj>();
 
 function isDebris(id: string) { return id.toLowerCase().includes('debris'); }
 
-function makeSat(id: string): SatObj {
+function makeSat(id: string, frames: Frame[]): SatObj {
   const baseColor = isDebris(id) ? COL.DEBRIS : COL.NORMAL;
-  const r = isDebris(id) ? 0.007 : 0.012;
+  const r = isDebris(id) ? 0.009 : 0.015;
 
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(r, 14, 8),
-    new THREE.MeshPhongMaterial({ color: baseColor, emissive: baseColor, emissiveIntensity: 0.55 }),
+    new THREE.SphereGeometry(r, 16, 10),
+    new THREE.MeshPhongMaterial({ color: baseColor, emissive: baseColor, emissiveIntensity: 0.6 }),
   );
 
   const glow = new THREE.Mesh(
     new THREE.SphereGeometry(r * 2.8, 10, 6),
-    new THREE.MeshBasicMaterial({ color: baseColor, transparent: true, opacity: 0.12 }),
+    new THREE.MeshBasicMaterial({ color: baseColor, transparent: true, opacity: 0.14 }),
   );
   mesh.add(glow);
 
-  // Name label
   const div = document.createElement('div');
   div.className = 'sat-label';
   div.textContent = id;
   const nameLabel = new CSS2DObject(div);
-  nameLabel.position.set(0, r * 3.5, 0);
+  nameLabel.position.set(0, r * 3.8, 0);
   mesh.add(nameLabel);
 
-  // Trail geometry — preallocate TRAIL_MAX * 3 floats
   const buf = new THREE.Float32BufferAttribute(new Float32Array(TRAIL_MAX * 3), 3);
   const trailGeom = new THREE.BufferGeometry();
   trailGeom.setAttribute('position', buf);
   trailGeom.setDrawRange(0, 0);
-  const trailMat = new THREE.LineBasicMaterial({ color: COL.TRAIL, transparent: true, opacity: 0.45 });
-  const trailLine = new THREE.Line(trailGeom, trailMat);
+  const trailLine = new THREE.Line(
+    trailGeom,
+    new THREE.LineBasicMaterial({ color: COL.TRAIL, transparent: true, opacity: 0.5 }),
+  );
+
+  const orbitRing = makeOrbitRing(id, frames);
 
   scene.add(mesh);
   scene.add(trailLine);
+  if (orbitRing) scene.add(orbitRing);
 
-  return { mesh, glow, trailLine, trailBuf: buf, trailPts: [], nameLabel };
+  return { mesh, glow, trailLine, trailBuf: buf, trailPts: [], nameLabel, orbitRing };
 }
 
 function clearSats() {
-  sats.forEach(s => { scene.remove(s.mesh); scene.remove(s.trailLine); });
+  sats.forEach(s => {
+    scene.remove(s.mesh);
+    scene.remove(s.trailLine);
+    if (s.orbitRing) scene.remove(s.orbitRing);
+  });
   sats.clear();
 }
 
-function initSats(ids: string[]) {
+function initSats(ids: string[], frames: Frame[]) {
   clearSats();
-  ids.forEach(id => sats.set(id, makeSat(id)));
+  ids.forEach(id => sats.set(id, makeSat(id, frames)));
 }
 
 // ── Conjunction / proposal overlays ──────────────────────────────────────────
 interface ConjState { aId: string; bId: string; miss: number; }
 
 let activeConjs: ConjState[] = [];
-let isResolved = false;
+let isResolved  = false;
 
-// Conjunction lines and miss-distance labels
-const conjLines  = new Map<string, THREE.Line>();       // key = sorted "a:b"
-const conjMidPts = new Map<string, CSS2DObject>();      // same key
+const conjLines  = new Map<string, THREE.Line>();
+const conjMidPts = new Map<string, CSS2DObject>();
 
 function ck(a: string, b: string) { return [a, b].sort().join(':'); }
 
 function upsertConjLine(a: string, b: string) {
   const key = ck(a, b);
   if (conjLines.has(key)) return;
-  const pts = [new THREE.Vector3(), new THREE.Vector3()];
-  const g = new THREE.BufferGeometry().setFromPoints(pts);
-  const line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: COL.DANGER }));
-  scene.add(line);
-  conjLines.set(key, line);
+  const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+  conjLines.set(key, new THREE.Line(g, new THREE.LineBasicMaterial({ color: COL.DANGER })));
+  scene.add(conjLines.get(key)!);
 }
 
 function removeConjLine(key: string) {
@@ -191,25 +367,21 @@ function removeConjLine(key: string) {
   if (mid) { scene.remove(mid); conjMidPts.delete(key); }
 }
 
-function clearAllConj() {
-  [...conjLines.keys()].forEach(k => removeConjLine(k));
-}
+function clearAllConj() { [...conjLines.keys()].forEach(k => removeConjLine(k)); }
 
 function updateConjLinePositions() {
   conjLines.forEach((line, key) => {
     const [aId, bId] = key.split(':');
     const sa = sats.get(aId), sb = sats.get(bId);
     if (!sa || !sb) return;
-    const pa = sa.mesh.position, pb = sb.mesh.position;
     const pos = line.geometry.attributes.position as THREE.BufferAttribute;
-    pos.setXYZ(0, pa.x, pa.y, pa.z);
-    pos.setXYZ(1, pb.x, pb.y, pb.z);
+    pos.setXYZ(0, sa.mesh.position.x, sa.mesh.position.y, sa.mesh.position.z);
+    pos.setXYZ(1, sb.mesh.position.x, sb.mesh.position.y, sb.mesh.position.z);
     pos.needsUpdate = true;
     line.geometry.computeBoundingSphere();
   });
 }
 
-// Miss distance label at midpoint of conj line
 function syncConjLabels() {
   activeConjs.forEach(c => {
     const key = ck(c.aId, c.bId);
@@ -230,29 +402,27 @@ function syncConjLabels() {
 }
 
 // Proposal animated link
-let propLine:   THREE.Line   | null = null;
-let propPacket: THREE.Mesh   | null = null;
+let propLine:   THREE.Line | null = null;
+let propPacket: THREE.Mesh | null = null;
 let propFrom:   string | null = null;
 let propTo:     string | null = null;
-let propWall0:  number = 0;
+let propWall0 = 0;
 
 function startProposal(fromId: string, toId: string) {
   clearProposal();
   const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-  propLine = new THREE.Line(g, new THREE.LineBasicMaterial({ color: COL.PROPOSAL, transparent: true, opacity: 0.7 }));
+  propLine = new THREE.Line(g, new THREE.LineBasicMaterial({ color: COL.PROPOSAL, transparent: true, opacity: 0.75 }));
   scene.add(propLine);
-
   propPacket = new THREE.Mesh(
-    new THREE.SphereGeometry(0.016, 8, 6),
+    new THREE.SphereGeometry(0.018, 8, 6),
     new THREE.MeshBasicMaterial({ color: COL.PROPOSAL }),
   );
   scene.add(propPacket);
-
   propFrom = fromId; propTo = toId; propWall0 = performance.now();
 }
 
 function clearProposal() {
-  if (propLine)   { scene.remove(propLine);   propLine = null; }
+  if (propLine)   { scene.remove(propLine);   propLine   = null; }
   if (propPacket) { scene.remove(propPacket); propPacket = null; }
   propFrom = propTo = null;
 }
@@ -267,8 +437,6 @@ function updateProposal(wallMs: number) {
   pos.setXYZ(1, pt.x, pt.y, pt.z);
   pos.needsUpdate = true;
   propLine.geometry.computeBoundingSphere();
-
-  // Packet oscillates along line (ping-pong)
   const t = ((wallMs - propWall0) / 2200) % 1;
   const ping = t < 0.5 ? t * 2 : (1 - t) * 2;
   propPacket.position.lerpVectors(pf, pt, ping);
@@ -282,7 +450,7 @@ function addManeuverArrow(objId: string, dv: Vec3) {
   const dir = new THREE.Vector3(...dv);
   if (dir.lengthSq() < 1e-12) return;
   dir.normalize();
-  const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(), 0.18, COL.PROPOSAL, 0.05, 0.028);
+  const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(), 0.22, COL.PROPOSAL, 0.06, 0.032);
   const sat = sats.get(objId);
   if (sat) { arrow.position.copy(sat.mesh.position); scene.add(arrow); manArrows.set(objId, arrow); }
 }
@@ -294,28 +462,24 @@ function removeManeuverArrow(id: string) {
 
 function clearAllArrows() { manArrows.forEach((_, id) => removeManeuverArrow(id)); }
 
-// "Resolved" celebratory labels per satellite
+// Resolved check marks
 const resolvedLabels = new Map<string, CSS2DObject>();
 
 function showResolvedLabels() {
   sats.forEach((sat, id) => {
-    if (isDebris(id)) return;
-    if (resolvedLabels.has(id)) return;
+    if (isDebris(id) || resolvedLabels.has(id)) return;
     const div = document.createElement('div');
     div.className = 'resolved-label';
     div.textContent = '✓';
     const obj = new CSS2DObject(div);
-    obj.position.set(0, 0.03, 0);
+    obj.position.set(0, 0.035, 0);
     sat.mesh.add(obj);
     resolvedLabels.set(id, obj);
   });
 }
 
 function clearResolvedLabels() {
-  resolvedLabels.forEach((obj, id) => {
-    const sat = sats.get(id);
-    if (sat) sat.mesh.remove(obj);
-  });
+  resolvedLabels.forEach((obj, id) => { sats.get(id)?.mesh.remove(obj); });
   resolvedLabels.clear();
 }
 
@@ -331,65 +495,53 @@ function interpolatePos(frames: Frame[], id: string, t: number): THREE.Vector3 |
     const o = last.objects.find(x => x.id === id);
     return o ? new THREE.Vector3(...o.r).multiplyScalar(S) : null;
   }
-  // Binary search
   let lo = 0, hi = frames.length - 1;
   while (lo < hi - 1) { const m = (lo + hi) >> 1; if (frames[m].t <= t) lo = m; else hi = m; }
   const f0 = frames[lo], f1 = frames[hi];
   const alpha = (t - f0.t) / (f1.t - f0.t);
-  const o0 = f0.objects.find(x => x.id === id);
-  const o1 = f1.objects.find(x => x.id === id);
+  const o0 = frames[lo].objects.find(x => x.id === id);
+  const o1 = frames[hi].objects.find(x => x.id === id);
   if (!o0 || !o1) return null;
   return new THREE.Vector3(...o0.r).lerp(new THREE.Vector3(...o1.r), alpha).multiplyScalar(S);
 }
 
 // ── Event processing ──────────────────────────────────────────────────────────
 function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
-  const fired = evts.filter(e => e.t > fromT && e.t <= toT);
-  for (const ev of fired) {
+  for (const ev of evts) {
+    if (ev.t <= fromT || ev.t > toT) continue;
     const d = ev.data;
     switch (ev.type) {
-      case 'conjunction_detected': {
-        const aId = d['a_id'] as string, bId = d['b_id'] as string;
-        const miss = d['miss_distance_km'] as number;
-        activeConjs = [...activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId)),
-                       { aId, bId, miss }];
-        upsertConjLine(aId, bId);
-        log(ev.t, `CONJUNCTION  ${aId} / ${bId}  —  miss ${miss.toFixed(1)} km`, 'danger');
-        break;
-      }
+      case 'conjunction_detected':
       case 'new_conjunction': {
         const aId = d['a_id'] as string, bId = d['b_id'] as string;
         const miss = d['miss_distance_km'] as number;
-        activeConjs = [...activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId)),
-                       { aId, bId, miss }];
+        activeConjs = [...activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId)), { aId, bId, miss }];
         upsertConjLine(aId, bId);
-        log(ev.t, `NEW CONJUNCTION  ${aId} / ${bId}  —  miss ${miss.toFixed(1)} km`, 'danger');
+        const prefix = ev.type === 'new_conjunction' ? 'NEW CONJUNCTION' : 'CONJUNCTION';
+        log(ev.t, `${prefix}  ${aId} / ${bId}  —  miss ${miss.toFixed(1)} km`, 'danger');
         break;
       }
       case 'proposal': {
         const fromId = d['proposer_id'] as string;
-        const dv = d['est_dv_cost'] as number;
-        // find the other party from active conj involving fromId
+        const recipientId = d['recipient_id'] as string | undefined;
         const conj = activeConjs.find(c => c.aId === fromId || c.bId === fromId);
-        const toId  = conj ? (conj.aId === fromId ? conj.bId : conj.aId) : '';
+        const toId = recipientId
+          ?? (conj ? (conj.aId === fromId ? conj.bId : conj.aId) : '');
         if (toId) startProposal(fromId, toId);
-        log(ev.t, `PROPOSAL  ${fromId} → negotiate  (Δv ${dv.toFixed(3)} km/s)`, 'proposal');
+        log(ev.t, `PROPOSAL  ${fromId} → negotiate  (Δv ${(d['est_dv_cost'] as number).toFixed(3)} km/s)`, 'proposal');
         break;
       }
       case 'maneuver_committed': {
         const objId = d['obj_id'] as string;
-        const dv = d['dv_vector'] as Vec3;
         clearProposal();
-        addManeuverArrow(objId, dv);
+        addManeuverArrow(objId, d['dv_vector'] as Vec3);
         log(ev.t, `BURN  ${objId}  —  Δv ${(d['est_dv_cost'] as number).toFixed(3)} km/s`, 'maneuver');
         break;
       }
       case 'resolved': {
         isResolved = true;
         activeConjs = [];
-        clearAllConj();
-        clearProposal();
-        clearAllArrows();
+        clearAllConj(); clearProposal(); clearAllArrows();
         showResolvedLabels();
         log(ev.t, `ALL CLEAR  —  total Δv ${(d['total_dv_km_s'] as number).toFixed(3)} km/s`, 'safe');
         break;
@@ -400,50 +552,31 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
 
 // Full rebuild when scrubbing backwards
 function rebuildState(evts: TLEvent[], upToT: number) {
-  activeConjs = [];
-  isResolved = false;
-  clearAllConj();
-  clearProposal();
-  clearAllArrows();
-  clearResolvedLabels();
+  activeConjs = []; isResolved = false;
+  clearAllConj(); clearProposal(); clearAllArrows(); clearResolvedLabels();
 
-  const seen = evts.filter(e => e.t <= upToT);
-  for (const ev of seen) {
+  for (const ev of evts) {
+    if (ev.t > upToT) break;
     const d = ev.data;
-    switch (ev.type) {
-      case 'conjunction_detected':
-      case 'new_conjunction': {
-        const aId = d['a_id'] as string, bId = d['b_id'] as string;
-        const miss = d['miss_distance_km'] as number;
-        activeConjs = [...activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId)),
-                       { aId, bId, miss }];
-        break;
-      }
-      case 'maneuver_committed': {
-        // track most recent per object (show arrow in post-process below)
-        break;
-      }
-      case 'resolved':
-        isResolved = true;
-        activeConjs = [];
-        break;
+    if (ev.type === 'conjunction_detected' || ev.type === 'new_conjunction') {
+      const aId = d['a_id'] as string, bId = d['b_id'] as string, miss = d['miss_distance_km'] as number;
+      activeConjs = [...activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId)), { aId, bId, miss }];
+    } else if (ev.type === 'resolved') {
+      isResolved = true; activeConjs = [];
     }
   }
-
   if (!isResolved) {
     activeConjs.forEach(c => upsertConjLine(c.aId, c.bId));
-    // Show arrow for last committed maneuver per object
     const lastMan = new Map<string, Vec3>();
-    seen.filter(e => e.type === 'maneuver_committed').forEach(e => {
-      lastMan.set(e.data['obj_id'] as string, e.data['dv_vector'] as Vec3);
-    });
+    evts.filter(e => e.t <= upToT && e.type === 'maneuver_committed')
+        .forEach(e => lastMan.set(e.data['obj_id'] as string, e.data['dv_vector'] as Vec3));
     lastMan.forEach((dv, id) => addManeuverArrow(id, dv));
   } else {
     showResolvedLabels();
   }
 }
 
-// ── Object color ──────────────────────────────────────────────────────────────
+// ── Satellite color ───────────────────────────────────────────────────────────
 function objectColor(id: string): number {
   if (isDebris(id)) return COL.DEBRIS;
   if (isResolved) return COL.SAFE;
@@ -451,7 +584,7 @@ function objectColor(id: string): number {
   return COL.NORMAL;
 }
 
-// ── Trail update (preallocated buffer) ────────────────────────────────────────
+// ── Trail push ────────────────────────────────────────────────────────────────
 function pushTrail(sat: SatObj, pos: THREE.Vector3) {
   sat.trailPts.push(pos.clone());
   if (sat.trailPts.length > TRAIL_MAX) sat.trailPts.shift();
@@ -465,7 +598,7 @@ function pushTrail(sat: SatObj, pos: THREE.Vector3) {
   sat.trailLine.geometry.computeBoundingSphere();
 }
 
-// ── Phase badge UI ────────────────────────────────────────────────────────────
+// ── Phase badge ───────────────────────────────────────────────────────────────
 function updatePhaseBadge() {
   if (isResolved) {
     phaseBadge.className = '';
@@ -481,13 +614,37 @@ function updatePhaseBadge() {
   }
 }
 
-// ── Log panel ─────────────────────────────────────────────────────────────────
+// ── Event log ─────────────────────────────────────────────────────────────────
 function log(t: number, msg: string, cls: string) {
   const entry = document.createElement('div');
   entry.className = `log-entry ${cls}`;
-  entry.textContent = `T+${t.toFixed(0).padStart(5)}s  ${msg}`;
+  entry.textContent = `T+${String(Math.round(t)).padStart(5)}s  ${msg}`;
   eventLog.appendChild(entry);
   eventLog.scrollTop = eventLog.scrollHeight;
+}
+
+// ── Event markers on scrubber ─────────────────────────────────────────────────
+const EVT_MARK_CLASS: Record<string, string> = {
+  conjunction_detected: 'danger',
+  new_conjunction:      'danger',
+  proposal:             'proposal',
+  maneuver_committed:   'maneuver',
+  resolved:             'safe',
+};
+
+function updateEventMarkers(evts: TLEvent[], tMin: number, tMax: number) {
+  eventMarks.innerHTML = '';
+  const range = tMax - tMin;
+  if (range <= 0) return;
+  evts.forEach(ev => {
+    const frac = (ev.t - tMin) / range;
+    const mark = document.createElement('div');
+    mark.className = `ev-mark ${EVT_MARK_CLASS[ev.type] ?? 'info'}`;
+    // Account for thumb half-width (~7px) so mark aligns with thumb position
+    mark.style.left = `calc(7px + ${(frac * 100).toFixed(3)}% - ${(frac * 14).toFixed(3)}px)`;
+    mark.title = `T+${ev.t}s: ${ev.type}`;
+    eventMarks.appendChild(mark);
+  });
 }
 
 // ── Playback state ────────────────────────────────────────────────────────────
@@ -496,40 +653,33 @@ let tMin = 0, tMax = 1;
 let playTime = 0;
 let playing  = false;
 let speed    = 10;
-let prevT    = 0;
 let trailTick = 0;
 
 function loadTimeline(data: Timeline) {
-  tl       = data;
-  tMin     = data.frames[0]?.t ?? 0;
-  tMax     = data.frames.at(-1)?.t ?? 1;
+  tl = data;
+  tMin = data.frames[0]?.t ?? 0;
+  tMax = data.frames.at(-1)?.t ?? 1;
   playTime = tMin;
-  prevT    = tMin;
   playing  = false;
   isResolved = false;
   activeConjs = [];
 
-  // Extract object IDs
   const metaObjs = data.meta['objects'];
   const ids: string[] = Array.isArray(metaObjs)
     ? (metaObjs as string[])
     : [...new Set(data.frames.flatMap(f => f.objects.map(o => o.id)))];
 
-  initSats(ids);
-  clearAllConj();
-  clearProposal();
-  clearAllArrows();
-  clearResolvedLabels();
+  initSats(ids, data.frames);
+  clearAllConj(); clearProposal(); clearAllArrows(); clearResolvedLabels();
 
   eventLog.innerHTML = '';
   scrubber.value = '0';
   updatePlayBtn();
   updateTimeDsp();
   updatePhaseBadge();
+  updateEventMarkers(data.events, tMin, tMax);
 
-  const scenario = (data.meta['scenario'] as string | undefined) ?? 'Unnamed scenario';
-  subtitleEl.textContent = scenario;
-
+  subtitleEl.textContent = (data.meta['scenario'] as string | undefined) ?? 'Unnamed scenario';
   log(tMin, `Loaded — ${ids.length} objects, ${data.events.length} events`, 'info');
 }
 
@@ -545,56 +695,48 @@ function frame() {
 
   if (tl) {
     if (playing) {
-      prevT = playTime;
+      const prev = playTime;
       playTime = Math.min(tMax, playTime + (dtMs / 1000) * speed);
-      processForwardEvents(tl.events, prevT, playTime);
+      processForwardEvents(tl.events, prev, playTime);
       if (playTime >= tMax) { playing = false; updatePlayBtn(); }
       scrubber.value = String(Math.round(((playTime - tMin) / (tMax - tMin)) * 1000));
     }
 
-    // Update satellite positions
     trailTick++;
-    const pushTrailNow = trailTick % 3 === 0;
     sats.forEach((sat, id) => {
       const pos = interpolatePos(tl!.frames, id, playTime);
       if (!pos) return;
       sat.mesh.position.copy(pos);
-      if (pushTrailNow) pushTrail(sat, pos);
-
-      // Arrow follows satellite
-      const arrow = manArrows.get(id);
-      if (arrow) arrow.position.copy(pos);
+      if (trailTick % 3 === 0) pushTrail(sat, pos);
+      manArrows.get(id)?.position.copy(pos);
     });
 
-    // Conjunction lines
     updateConjLinePositions();
-
-    // Miss distance labels
     if (trailTick % 8 === 0) syncConjLabels();
-
-    // Proposal animation
     updateProposal(nowMs);
 
-    // Object colors + pulse
-    const pulse = 0.45 + 0.55 * Math.sin(nowMs * 0.0065);
+    // Color + pulse
+    const pulse = 0.45 + 0.55 * Math.sin(nowMs * 0.007);
     sats.forEach((sat, id) => {
       const col = objectColor(id);
-      const mat = sat.mesh.material as THREE.MeshPhongMaterial;
+      const mat  = sat.mesh.material as THREE.MeshPhongMaterial;
       const gMat = sat.glow.material as THREE.MeshBasicMaterial;
-      mat.color.setHex(col);
-      mat.emissive.setHex(col);
+      mat.color.setHex(col); mat.emissive.setHex(col);
+      const danger = !isResolved && activeConjs.some(c => c.aId === id || c.bId === id);
+      mat.emissiveIntensity = danger ? 0.35 + pulse * 0.65 : 0.55;
+      gMat.color.setHex(col); gMat.opacity = danger ? 0.08 + pulse * 0.28 : 0.12;
 
-      const inDanger = !isResolved && activeConjs.some(c => c.aId === id || c.bId === id);
-      mat.emissiveIntensity = inDanger ? 0.35 + pulse * 0.65 : 0.5;
-      gMat.color.setHex(col);
-      gMat.opacity = inDanger ? 0.08 + pulse * 0.25 : 0.1;
-
-      // Trail color
       const tMat = sat.trailLine.material as THREE.LineBasicMaterial;
-      tMat.color.setHex(inDanger ? 0x440000 : (isResolved ? 0x004422 : COL.TRAIL));
+      tMat.color.setHex(danger ? 0x440000 : isResolved ? 0x004422 : COL.TRAIL);
+
+      // Orbit ring: brighten when in danger, dim otherwise
+      if (sat.orbitRing) {
+        const rMat = sat.orbitRing.material as THREE.LineBasicMaterial;
+        rMat.color.setHex(danger ? 0x441100 : isResolved ? 0x004422 : COL.RING);
+        rMat.opacity = danger ? 0.55 + pulse * 0.20 : 0.38;
+      }
     });
 
-    // Phase badge
     if (trailTick % 5 === 0) updatePhaseBadge();
     updateTimeDsp();
   }
@@ -614,11 +756,11 @@ function updateTimeDsp() {
   timeDsp.textContent = `T+${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
 }
 
-// ── UI event wiring ───────────────────────────────────────────────────────────
+// ── UI wiring ─────────────────────────────────────────────────────────────────
 playBtn.addEventListener('click', () => {
   if (!tl) return;
   if (!playing && playTime >= tMax) {
-    playTime = tMin; prevT = tMin;
+    playTime = tMin;
     rebuildState(tl.events, tMin);
     scrubber.value = '0';
   }
@@ -638,16 +780,13 @@ scrubber.addEventListener('input', () => {
   } else {
     processForwardEvents(tl.events, playTime, newT);
   }
-  prevT = playTime;
   playTime = newT;
 
-  // Update satellite positions immediately for scrub preview
   sats.forEach((sat, id) => {
     const pos = interpolatePos(tl!.frames, id, playTime);
     if (pos) { sat.mesh.position.copy(pos); sat.trailPts = []; sat.trailLine.geometry.setDrawRange(0, 0); }
   });
-  updatePhaseBadge();
-  updateTimeDsp();
+  updatePhaseBadge(); updateTimeDsp();
   if (wasPlaying) { playing = true; updatePlayBtn(); }
 });
 
