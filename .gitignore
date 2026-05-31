@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.uv/
+
+# Node / web
+web/node_modules/
+node_modules/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code local (per-machine) settings
+.claude/settings.local.json
+
+# Playwright (per house rules)
+.playwright-mcp/

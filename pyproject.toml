@@ -1,0 +1,27 @@
+[project]
+name = "row"
+version = "0.1.0"
+description = "Right of Way — decentralized orbital collision-avoidance harness"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+# WS1 (physics core) pulls these in when it implements real propagation.
+physics = [
+    "numpy>=1.26",
+    "sgp4>=2.23",
+    "skyfield>=1.49",
+]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["row"]
