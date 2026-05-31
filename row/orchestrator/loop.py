@@ -74,7 +74,12 @@ def run(
         dt_seconds: Timeline frame cadence.
         output_path: where to write the Timeline JSON (None to skip writing).
     """
-    physics = physics or KeplerPhysics()
+    if physics is None:
+        # Default to WS1's real core (needs numpy). Imported lazily so the loop
+        # module stays importable without numpy (e.g. for the double-only tests).
+        from ..physics import PhysicsCore
+
+        physics = PhysicsCore()
     negotiator = negotiator or _negotiator_for(topology)
     fallback = ReferenceHierarchical()
     scenario = scenario or generate_scenario()
@@ -187,8 +192,24 @@ def run(
                 )
 
         # Apply committed maneuvers via the referee, then loop to RE-SCREEN.
+        # The referee rejects over-budget burns (ValueError) — a misbehaving
+        # negotiator shouldn't commit one, but if it does we flag it and stop
+        # rather than crash (graceful failure).
+        commit_failed = False
         for prop in result.committed:
-            current = physics.apply_maneuver(current, prop.proposer_id, prop.dv_vector, prop.t_burn)
+            try:
+                current = physics.apply_maneuver(current, prop.proposer_id, prop.dv_vector, prop.t_burn)
+            except ValueError as exc:
+                note = f"referee rejected {prop.proposer_id}'s over-budget maneuver: {exc}"
+                events.append(
+                    TimelineEvent(
+                        t=detect_t,
+                        type="proposal",
+                        data={"rejected": True, "obj_id": prop.proposer_id, "note": note},
+                    )
+                )
+                commit_failed = True
+                break
             burns.setdefault(prop.proposer_id, []).append((prop.t_burn, tuple(prop.dv_vector)))
             total_dv += prop.est_dv_cost
             last_commit_t = max(last_commit_t, prop.t_burn)
@@ -205,6 +226,8 @@ def run(
                     },
                 )
             )
+        if commit_failed:
+            break
         iteration += 1
 
     if converged_scene:

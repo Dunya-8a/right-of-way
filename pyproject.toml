@@ -6,14 +6,15 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7",
+    "numpy>=1.26",  # WS1 physics core — now the orchestrator's default referee
 ]
 
 [project.optional-dependencies]
-# WS1 (physics core) pulls these in when it implements real propagation.
+# Higher-fidelity / TLE propagation and the MCP server wrapper (optional).
 physics = [
-    "numpy>=1.26",
     "sgp4>=2.23",
     "skyfield>=1.49",
+    "mcp>=1.0",
 ]
 dev = [
     "pytest>=8.0",

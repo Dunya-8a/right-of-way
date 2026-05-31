@@ -135,11 +135,17 @@ class KeplerPhysics(PhysicsCore):
             if o.id != obj_id or o.state is None:
                 new_objs.append(o)
                 continue
+            # Match the real core's contract: refuse over-budget burns so a
+            # ~0-fuel object physically cannot be the mover (the forced trade).
+            if dv_mag > o.fuel_budget_dv + 1e-12:
+                raise ValueError(
+                    f"{obj_id}: maneuver |dv|={dv_mag:.4f} km/s exceeds "
+                    f"fuel_budget_dv={o.fuel_budget_dv:.4f} km/s"
+                )
             r_b, v_b = kepler(tuple(o.state.r), tuple(o.state.v), t_burn)
             r_e, v_e = kepler(r_b, add(v_b, dv), -t_burn)  # re-anchor to epoch
             # Spend the fuel: the post-burn world reflects reduced budget so a
-            # later iteration can't re-burn beyond the physical limit. (Contract:
-            # apply_maneuver decrements the mover's fuel_budget_dv by |dv|.)
+            # later iteration can't re-burn beyond the physical limit.
             new_fuel = max(0.0, o.fuel_budget_dv - dv_mag)
             new_objs.append(
                 o.model_copy(update={"state": State(r=r_e, v=v_e), "fuel_budget_dv": new_fuel})
@@ -198,7 +204,10 @@ def greedy_clearance(ctx: NegotiationContext, mover, partner):
             if mag > fuel:
                 break  # mags ascending: skip the rest for THIS direction, try next
             dv = scale(unit(d), mag)
-            trial = physics.apply_maneuver(scenario, mover.id, list(dv), t_burn)
+            try:
+                trial = physics.apply_maneuver(scenario, mover.id, list(dv), t_burn)
+            except ValueError:
+                continue  # referee refused this burn (over budget); try the next
             still = any(
                 _pair_key(c.a_id, c.b_id) == want
                 for c in physics.screen_conjunctions(trial, window)

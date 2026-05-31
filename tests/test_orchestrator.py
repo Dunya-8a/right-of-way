@@ -82,6 +82,19 @@ def test_apply_maneuver_decrements_fuel():
     assert a0 == a1
 
 
+def test_sat_A_cannot_maneuver():
+    """The referee refuses a burn larger than the mover's fuel (forced trade):
+    sat_A (~0 fuel) physically cannot maneuver."""
+    s = generate_scenario()
+    ph = KeplerPhysics()
+    raised = False
+    try:
+        ph.apply_maneuver(s, "sat_A", [0.0, 0.0, 0.010], 240.0)
+    except ValueError:
+        raised = True
+    assert raised, "referee must reject sat_A's over-budget burn"
+
+
 def test_frames_cover_whole_arc():
     """The last frame must reach the horizon so the viz plays past 'resolved'."""
     res = run(topology="hierarchical", output_path=None)
