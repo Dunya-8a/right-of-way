@@ -6,7 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7",
-    "numpy>=1.26",  # WS1 physics core — now the orchestrator's default referee
+    "numpy>=1.26",       # WS1 physics core — the orchestrator's default referee
+    "anthropic>=0.40",   # WS2 ClaudeBrain (real-LLM agents); falls back to MockBrain w/o a key
 ]
 
 [project.optional-dependencies]
