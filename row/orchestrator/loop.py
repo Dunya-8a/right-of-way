@@ -46,7 +46,14 @@ class RunResult:
 
 
 def _negotiator_for(topology: Topology) -> Negotiator:
-    return ReferenceSwarm() if topology == "swarm" else ReferenceHierarchical()
+    """WS2's real negotiators (peer-to-peer A2A swarm / hierarchical coordinator),
+    falling back to the WS3 reference doubles if WS2 isn't importable."""
+    try:
+        from row.agents import make_negotiator
+
+        return make_negotiator(topology)
+    except Exception:
+        return ReferenceSwarm() if topology == "swarm" else ReferenceHierarchical()
 
 
 def run(
@@ -81,7 +88,7 @@ def run(
 
         physics = PhysicsCore()
     negotiator = negotiator or _negotiator_for(topology)
-    fallback = ReferenceHierarchical()
+    fallback = ReferenceHierarchical()  # deterministic, physics-verified resolver
     scenario = scenario or generate_scenario()
 
     original = scenario
@@ -160,16 +167,26 @@ def run(
         result = negotiator.negotiate(ctx)
         rounds_total += result.rounds_used
 
-        # Graceful fallback: swarm that can't converge -> hierarchical coordinator.
-        if (not result.converged or not result.committed) and topology == "swarm":
+        # Graceful fallback (any topology): if the primary negotiator can't
+        # converge — e.g. the agents agree who should move but their proposed
+        # burn fails the physics verifier — hand off to the deterministic,
+        # physics-verified coordinator, which searches for a feasible clearing
+        # burn. The agents' transcript is preserved so the negotiation still shows.
+        if not result.converged or not result.committed:
+            agent_messages = list(result.messages)
             events.append(
                 TimelineEvent(
                     t=detect_t,
                     type="proposal",
-                    data={"fallback": True, "note": "swarm did not converge; falling back to hierarchical coordinator"},
+                    data={
+                        "fallback": True,
+                        "note": f"{topology} negotiation did not converge ({result.note}); "
+                        f"deterministic verified fallback engaged",
+                    },
                 )
             )
             result = fallback.negotiate(ctx)
+            result.messages = agent_messages + result.messages
             rounds_total += result.rounds_used
 
         if not result.converged or not result.committed:
