@@ -18,5 +18,8 @@ node_modules/
 # Claude Code local (per-machine) settings
 .claude/settings.local.json
 
+# WS3 runtime output (the emitted run; sample_timeline.json is the committed fixture)
+web/public/timeline.json
+
 # Playwright (per house rules)
 .playwright-mcp/
