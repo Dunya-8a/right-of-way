@@ -50,10 +50,19 @@ do exactly.
 ## Seam: WS1 — PhysicsCore (`row/physics.py`)
 
 Implement the three methods in `row/physics.py` (signatures already there).
-Stateless, deterministic, pure (never mutate the input Scenario). `apply_maneuver`
-returns a NEW Scenario. WS3 ships a Kepler **reference double** so the pipeline
-runs today; your real core (sgp4 / Skyfield / higher-fidelity two-body) is a
-drop-in replacement behind the same interface. Stretch: the MCP server wrapper.
+Stateless, deterministic, pure (never mutate the input Scenario). WS3 ships a
+Kepler **reference double** so the pipeline runs today; your real core (sgp4 /
+Skyfield / higher-fidelity two-body) is a drop-in replacement behind the same
+interface. Stretch: the MCP server wrapper.
+
+Two requirements the WS3 loop relies on (surfaced by code review):
+- **`apply_maneuver` must spend fuel:** return the new Scenario with the mover's
+  `fuel_budget_dv` reduced by `|dv|`. The orchestrator re-reads budgets each
+  iteration; if you don't decrement, a sat can overdraft across multiple burns.
+- **`screen_conjunctions` should find ALL close approaches in the window**, not
+  just the nearest one per pair. The reference double assumes one approach per
+  pair (valid only while `screen_window_s` < one orbital period, ~5677 s);
+  the real core should handle multiple minima for longer windows.
 
 ## Seam: WS2 — Negotiator (`row/orchestrator/interfaces.py`)
 
