@@ -85,23 +85,42 @@ const GIBS_COLS   = 5;
 const GIBS_ROWS   = 3;
 const GIBS_TILE   = 512;
 
-const GIBS_LAYERS = [
-  'VIIRS_NOAA20_CorrectedReflectance_TrueColor',
-  'MODIS_Aqua_CorrectedReflectance_TrueColor',
-];
+const GIBS_LAYER_VIIRS = 'VIIRS_NOAA20_CorrectedReflectance_TrueColor';
 
-async function fetchLayerTiles(
-  layer: string, dateStr: string,
-  canvas: HTMLCanvasElement, composite: GlobalCompositeOperation,
-  partialTex: THREE.CanvasTexture,
-): Promise<void> {
+async function fetchLiveEarth(mat: THREE.MeshPhongMaterial): Promise<void> {
+  const now = new Date();
+  now.setDate(now.getDate() - 1);
+  const dateStr = now.toISOString().slice(0, 10);
+  setEarthStatusLabel(`LIVE  ${dateStr}…`);
+
+  const W = GIBS_COLS * GIBS_TILE, H = GIBS_ROWS * GIBS_TILE;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d')!;
-  ctx.globalCompositeOperation = composite;
 
+  // Step 1: draw Blue Marble as base so ocean + southern hemisphere look correct
+  //         while tiles load, and as permanent fallback for gap areas
+  ctx.fillStyle = '#0d2545'; ctx.fillRect(0, 0, W, H);
+  await new Promise<void>(resolve => {
+    const img = new Image();
+    img.onload = () => { ctx.drawImage(img, 0, 0, W, H); resolve(); };
+    img.onerror = () => resolve();
+    img.src = '/earth.jpg';
+  });
+
+  // Show Blue Marble immediately
+  const partialTex = new THREE.CanvasTexture(canvas);
+  partialTex.colorSpace = THREE.SRGBColorSpace;
+  mat.map = partialTex; mat.specularMap = null; mat.needsUpdate = true;
+
+  // Step 2: overlay VIIRS NOAA-20 tiles with 'lighten' blend:
+  //   bright pixels (clouds, lit land) win over Blue Marble
+  //   dark pixels (no-data, night ocean) → Blue Marble shows through
+  ctx.globalCompositeOperation = 'lighten';
   const fetches: Promise<void>[] = [];
   for (let row = 0; row < GIBS_ROWS; row++) {
     for (let col = 0; col < GIBS_COLS; col++) {
-      const url = `${GIBS_BASE}/${layer}/default/${dateStr}/${GIBS_MATRIX}/${GIBS_ZOOM}/${row}/${col}.jpeg`;
+      const url = `${GIBS_BASE}/${GIBS_LAYER_VIIRS}/default/${dateStr}/${GIBS_MATRIX}/${GIBS_ZOOM}/${row}/${col}.jpeg`;
       fetches.push(
         fetch(url)
           .then(r => { if (!r.ok) throw new Error(r.status.toString()); return r.blob(); })
@@ -115,37 +134,12 @@ async function fetchLayerTiles(
             img.onerror = () => resolve();
             img.src = URL.createObjectURL(blob);
           }))
-          .catch(() => { /* silently skip failed tiles */ }),
+          .catch(() => { /* skip failed tile — Blue Marble already underneath */ }),
       );
     }
   }
   await Promise.all(fetches);
-  ctx.globalCompositeOperation = 'source-over'; // reset
-}
-
-async function fetchLiveEarth(mat: THREE.MeshPhongMaterial): Promise<void> {
-  // Use yesterday's date (VIIRS/MODIS have ~1-day latency)
-  const now = new Date();
-  now.setDate(now.getDate() - 1);
-  const dateStr = now.toISOString().slice(0, 10);
-  setEarthStatusLabel(`LIVE  ${dateStr}…`);
-
-  const W = GIBS_COLS * GIBS_TILE, H = GIBS_ROWS * GIBS_TILE;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#0d2545'; ctx.fillRect(0, 0, W, H);
-
-  const partialTex = new THREE.CanvasTexture(canvas);
-  partialTex.colorSpace = THREE.SRGBColorSpace;
-  mat.map = partialTex; mat.specularMap = null; mat.needsUpdate = true;
-
-  // Layer 1: VIIRS NOAA-20 (primary, best daily coverage)
-  await fetchLayerTiles(GIBS_LAYERS[0], dateStr, canvas, 'source-over', partialTex);
-  setEarthStatusLabel(`LIVE  ${dateStr}  filling gaps…`);
-
-  // Layer 2: MODIS Aqua (fills swath gaps via lighten blend — only overwrites dark pixels)
-  await fetchLayerTiles(GIBS_LAYERS[1], dateStr, canvas, 'lighten', partialTex);
+  ctx.globalCompositeOperation = 'source-over';
 
   partialTex.needsUpdate = true;
   setEarthStatusLabel(`LIVE  ${dateStr}  ✓`);
