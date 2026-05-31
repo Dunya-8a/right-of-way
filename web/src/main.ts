@@ -74,43 +74,34 @@ function loadStaticEarth(mat: THREE.MeshPhongMaterial) {
 }
 
 // Option B: assemble today's Earth from NASA GIBS WMTS tiles
-// Uses MODIS Terra TrueColor, EPSG:4326, 250m matrix set, TileMatrix=1
-// → 3 cols × 2 rows, each tile 512×512 px → 1536×1024 canvas
-// URL template from GetCapabilities:
-//   .../default/{date}/250m/{TileMatrix}/{TileRow}/{TileCol}.jpeg
-const GIBS_LAYER  = 'MODIS_Terra_CorrectedReflectance_TrueColor';
+// TileMatrixSet=250m, TileMatrix=2 → 5 cols × 3 rows, 512px tiles → 2560×1536
+// Layers composited (lighten blend) for near-complete daily global coverage:
+//   1. VIIRS NOAA-20  (3040km swath, ~99% daily coverage)
+//   2. MODIS Aqua     (fills remaining gaps with 2330km swath, different orbit)
+const GIBS_BASE   = 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best';
 const GIBS_MATRIX = '250m';
-const GIBS_ZOOM   = 1;   // TileMatrix=1: 3 cols × 2 rows
-const GIBS_COLS   = 3;
-const GIBS_ROWS   = 2;
+const GIBS_ZOOM   = 2;    // TileMatrix=2: 5 cols × 3 rows
+const GIBS_COLS   = 5;
+const GIBS_ROWS   = 3;
 const GIBS_TILE   = 512;
 
-async function fetchLiveEarth(mat: THREE.MeshPhongMaterial): Promise<void> {
-  // Use yesterday's date (MODIS has ~1-day latency)
-  const now = new Date();
-  now.setDate(now.getDate() - 1);
-  const dateStr = now.toISOString().slice(0, 10);
-  setEarthStatusLabel(`LIVE  ${dateStr}`);
+const GIBS_LAYERS = [
+  'VIIRS_NOAA20_CorrectedReflectance_TrueColor',
+  'MODIS_Aqua_CorrectedReflectance_TrueColor',
+];
 
-  const W = GIBS_COLS * GIBS_TILE, H = GIBS_ROWS * GIBS_TILE;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+async function fetchLayerTiles(
+  layer: string, dateStr: string,
+  canvas: HTMLCanvasElement, composite: GlobalCompositeOperation,
+  partialTex: THREE.CanvasTexture,
+): Promise<void> {
   const ctx = canvas.getContext('2d')!;
-  // Ocean fill while tiles load
-  ctx.fillStyle = '#0d2545'; ctx.fillRect(0, 0, W, H);
-  // Show partial canvas immediately
-  const partialTex = new THREE.CanvasTexture(canvas);
-  partialTex.colorSpace = THREE.SRGBColorSpace;
-  mat.map = partialTex; mat.specularMap = null; mat.needsUpdate = true;
+  ctx.globalCompositeOperation = composite;
 
   const fetches: Promise<void>[] = [];
   for (let row = 0; row < GIBS_ROWS; row++) {
     for (let col = 0; col < GIBS_COLS; col++) {
-      const url = [
-        'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best',
-        GIBS_LAYER, 'default', dateStr, GIBS_MATRIX,
-        GIBS_ZOOM, row, col,
-      ].join('/') + '.jpeg';
+      const url = `${GIBS_BASE}/${layer}/default/${dateStr}/${GIBS_MATRIX}/${GIBS_ZOOM}/${row}/${col}.jpeg`;
       fetches.push(
         fetch(url)
           .then(r => { if (!r.ok) throw new Error(r.status.toString()); return r.blob(); })
@@ -124,12 +115,38 @@ async function fetchLiveEarth(mat: THREE.MeshPhongMaterial): Promise<void> {
             img.onerror = () => resolve();
             img.src = URL.createObjectURL(blob);
           }))
-          .catch(() => {/* silently skip failed tiles */}),
+          .catch(() => { /* silently skip failed tiles */ }),
       );
     }
   }
-
   await Promise.all(fetches);
+  ctx.globalCompositeOperation = 'source-over'; // reset
+}
+
+async function fetchLiveEarth(mat: THREE.MeshPhongMaterial): Promise<void> {
+  // Use yesterday's date (VIIRS/MODIS have ~1-day latency)
+  const now = new Date();
+  now.setDate(now.getDate() - 1);
+  const dateStr = now.toISOString().slice(0, 10);
+  setEarthStatusLabel(`LIVE  ${dateStr}…`);
+
+  const W = GIBS_COLS * GIBS_TILE, H = GIBS_ROWS * GIBS_TILE;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#0d2545'; ctx.fillRect(0, 0, W, H);
+
+  const partialTex = new THREE.CanvasTexture(canvas);
+  partialTex.colorSpace = THREE.SRGBColorSpace;
+  mat.map = partialTex; mat.specularMap = null; mat.needsUpdate = true;
+
+  // Layer 1: VIIRS NOAA-20 (primary, best daily coverage)
+  await fetchLayerTiles(GIBS_LAYERS[0], dateStr, canvas, 'source-over', partialTex);
+  setEarthStatusLabel(`LIVE  ${dateStr}  filling gaps…`);
+
+  // Layer 2: MODIS Aqua (fills swath gaps via lighten blend — only overwrites dark pixels)
+  await fetchLayerTiles(GIBS_LAYERS[1], dateStr, canvas, 'lighten', partialTex);
+
   partialTex.needsUpdate = true;
   setEarthStatusLabel(`LIVE  ${dateStr}  ✓`);
 }
