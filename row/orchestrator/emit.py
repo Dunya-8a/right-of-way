@@ -49,6 +49,8 @@ def _segment_anchors(
 
 
 def _state_at(physics, original, obj, anchors, t: float) -> State:
+    # anchors are sorted ascending by t_start (built that way in _segment_anchors),
+    # so we can walk to the last anchor at or before t and stop.
     t_a, st = anchors[0]
     for ta, s in anchors:
         if ta <= t + 1e-9:
@@ -71,14 +73,19 @@ def build_timeline(
     anchors = {o.id: _segment_anchors(physics, original, o, burns.get(o.id, [])) for o in objs}
 
     frames: list[Frame] = []
-    n = int(horizon_s / dt_seconds) + 1
+    n = int(horizon_s / dt_seconds) + 2  # +2 guarantees a frame exactly at horizon
     for i in range(n):
-        t = min(horizon_s, i * dt_seconds)
+        t = i * dt_seconds
+        clip = t >= horizon_s
+        if clip:
+            t = horizon_s
         fobjs = []
         for o in objs:
             st = _state_at(physics, original, o, anchors[o.id], t)
             fobjs.append(FrameObject(id=o.id, r=st.r, v=st.v))
         frames.append(Frame(t=t, objects=fobjs))
+        if clip:  # reached the horizon exactly; stop (no duplicate frame)
+            break
 
     meta = {
         "frame": "ECI",

@@ -12,6 +12,7 @@ Units: km, km/s, seconds. Earth-centered inertial.
 from __future__ import annotations
 
 import math
+import warnings
 
 from ..contracts import Vec3
 
@@ -99,7 +100,7 @@ def kepler(r0: Vec3, v0: Vec3, dt: float, mu: float = MU_EARTH) -> tuple[Vec3, V
         chi = sqrt_mu * abs(dt) / r0n * math.copysign(1.0, dt)
 
     # Newton-Raphson on the universal Kepler equation.
-    chi_prev = chi
+    converged = False
     for _ in range(200):
         z = alpha * chi * chi
         c = _stumpff_c(z)
@@ -118,8 +119,15 @@ def kepler(r0: Vec3, v0: Vec3, dt: float, mu: float = MU_EARTH) -> tuple[Vec3, V
         dchi = f_chi / r
         chi -= dchi
         if abs(dchi) < 1e-9:
+            converged = True
             break
-        chi_prev = chi
+    if not converged:
+        warnings.warn(
+            f"kepler: universal-anomaly Newton iteration did not converge "
+            f"(dt={dt}, alpha={alpha:.3e}); propagated state may be inaccurate.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     z = alpha * chi * chi
     c = _stumpff_c(z)

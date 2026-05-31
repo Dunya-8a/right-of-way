@@ -65,6 +65,8 @@ class KeplerPhysics(PhysicsCore):
         step = self._step
         n = max(2, int(window / step) + 1)
         times = [min(float(window), i * step) for i in range(n)]
+        if times[-1] < float(window):  # always sample the window endpoint
+            times.append(float(window))
 
         # Cache propagated positions per (id, sampled-time).
         cache: dict[tuple[str, float], tuple[float, float, float]] = {}
@@ -82,8 +84,12 @@ class KeplerPhysics(PhysicsCore):
             def sep(t: float) -> float:
                 return norm(sub(pos(a, t), pos(b, t)))
 
-            # Coarse scan -> sample with the smallest separation (single approach
-            # per pair over <1 orbit, so the global-min sample brackets the TCA).
+            # Coarse scan -> sample with the smallest separation, then refine.
+            # ASSUMPTION: at most one close approach per pair in the window, which
+            # holds while screen_window_s < one orbital period (~5677 s at this
+            # altitude; demo uses 3600 s). This double reports only the global-min
+            # approach; WS1's real screener should find ALL local minima for longer
+            # windows. The global-min sample brackets that single TCA.
             best_i, best_d = 0, float("inf")
             for i, t in enumerate(times):
                 d = sep(t)
@@ -123,6 +129,7 @@ class KeplerPhysics(PhysicsCore):
         self, scenario: Scenario, obj_id: str, dv_vector, t_burn: float
     ) -> Scenario:
         dv = (float(dv_vector[0]), float(dv_vector[1]), float(dv_vector[2]))
+        dv_mag = norm(dv)
         new_objs = []
         for o in scenario.objects:
             if o.id != obj_id or o.state is None:
@@ -130,7 +137,13 @@ class KeplerPhysics(PhysicsCore):
                 continue
             r_b, v_b = kepler(tuple(o.state.r), tuple(o.state.v), t_burn)
             r_e, v_e = kepler(r_b, add(v_b, dv), -t_burn)  # re-anchor to epoch
-            new_objs.append(o.model_copy(update={"state": State(r=r_e, v=v_e)}))
+            # Spend the fuel: the post-burn world reflects reduced budget so a
+            # later iteration can't re-burn beyond the physical limit. (Contract:
+            # apply_maneuver decrements the mover's fuel_budget_dv by |dv|.)
+            new_fuel = max(0.0, o.fuel_budget_dv - dv_mag)
+            new_objs.append(
+                o.model_copy(update={"state": State(r=r_e, v=v_e), "fuel_budget_dv": new_fuel})
+            )
         return scenario.model_copy(update={"objects": new_objs})
 
 
@@ -183,7 +196,7 @@ def greedy_clearance(ctx: NegotiationContext, mover, partner):
     for name, d in directions:
         for mag in mags:
             if mag > fuel:
-                break
+                break  # mags ascending: skip the rest for THIS direction, try next
             dv = scale(unit(d), mag)
             trial = physics.apply_maneuver(scenario, mover.id, list(dv), t_burn)
             still = any(

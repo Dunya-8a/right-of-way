@@ -98,6 +98,11 @@ def run(
 
     while iteration < max_iterations:
         conjs = physics.screen_conjunctions(current, window)
+        # Only consider conjunctions that are still in the future relative to the
+        # last committed burn. Burns are baked into the epoch state, so positions
+        # for t < t_burn don't reflect reality; and a conjunction before the last
+        # burn is already in the committed past and can't be maneuvered away.
+        conjs = [c for c in conjs if c.tca > last_commit_t + 1e-6]
         if not conjs:
             converged_scene = True
             break
@@ -107,9 +112,14 @@ def run(
         detect_t = 0.0 if iteration == 0 else last_commit_t
         all_tca.append(c.tca)
 
-        involved = [o for o in current.objects if o.id in (c.a_id, c.b_id)]
+        # Defensive deep copy: the negotiator (WS2) must not mutate the loop's
+        # working scenario; hand it an isolated copy so a buggy agent can't
+        # corrupt `current`.
+        ctx_scenario = current.model_copy(deep=True)
+        involved = [o for o in ctx_scenario.objects if o.id in (c.a_id, c.b_id)]
         immobile = [o.id for o in involved if o.fuel_budget_dv <= MIN_FUEL_DV]
-        etype = "new_conjunction" if (iteration > 0 and pair not in seen_pairs) else "conjunction_detected"
+        is_retry = pair in seen_pairs
+        etype = "new_conjunction" if (iteration > 0 and not is_retry) else "conjunction_detected"
         seen_pairs.add(pair)
         events.append(
             TimelineEvent(
@@ -122,6 +132,7 @@ def run(
                     "miss_distance_km": c.miss_distance_km,
                     "rel_speed": c.rel_speed,
                     "immobile": immobile,
+                    "retry": is_retry,
                     "note": (
                         f"{immobile[0]} is out of fuel and cannot maneuver — the "
                         f"naive 'lowest-priority yields' rule is impossible here."
@@ -133,7 +144,7 @@ def run(
         )
 
         ctx = NegotiationContext(
-            scenario=current,
+            scenario=ctx_scenario,
             conjunction=c,
             involved=involved,
             physics=physics,

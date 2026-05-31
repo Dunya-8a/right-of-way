@@ -68,6 +68,27 @@ def test_swarm_converges():
     assert _event_types(res)[-1] == "resolved"
 
 
+def test_apply_maneuver_decrements_fuel():
+    """A burn must spend fuel so a later iteration can't overdraft the budget."""
+    s = generate_scenario()
+    ph = KeplerPhysics()
+    b0 = next(o for o in s.objects if o.id == "sat_B").fuel_budget_dv
+    s2 = ph.apply_maneuver(s, "sat_B", [0.0, 0.0, 0.010], 240.0)
+    b1 = next(o for o in s2.objects if o.id == "sat_B").fuel_budget_dv
+    assert abs((b0 - b1) - 0.010) < 1e-9  # spent exactly |dv|
+    # other objects untouched
+    a0 = next(o for o in s.objects if o.id == "sat_A").fuel_budget_dv
+    a1 = next(o for o in s2.objects if o.id == "sat_A").fuel_budget_dv
+    assert a0 == a1
+
+
+def test_frames_cover_whole_arc():
+    """The last frame must reach the horizon so the viz plays past 'resolved'."""
+    res = run(topology="hierarchical", output_path=None)
+    last_event_t = max(e.t for e in res.events)
+    assert res.timeline.frames[-1].t >= last_event_t
+
+
 def test_emitted_timeline_is_dropin_for_viz():
     res = run(topology="hierarchical", output_path=None)
     # Round-trips through the same model the fixture/viz use.
