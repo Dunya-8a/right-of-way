@@ -28,97 +28,116 @@ const COL = {
 
 const TRAIL_MAX = 40;
 
-// ── Procedural Earth texture ──────────────────────────────────────────────────
-function makeEarthTexture(): THREE.CanvasTexture {
-  const W = 1024, H = 512;
+// ── Earth texture loading ─────────────────────────────────────────────────────
+
+// Fallback canvas texture (used while real texture loads or if fetch fails)
+function makeProceduralEarth(): THREE.CanvasTexture {
+  const W = 512, H = 256;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d')!;
-
-  // Ocean gradient
   const ocean = ctx.createLinearGradient(0, 0, 0, H);
-  ocean.addColorStop(0,   '#0b2240');
-  ocean.addColorStop(0.5, '#0d2d55');
-  ocean.addColorStop(1,   '#0b2240');
-  ctx.fillStyle = ocean;
-  ctx.fillRect(0, 0, W, H);
-
-  // Helper: draw a rough land ellipse
-  function land(cx: number, cy: number, rx: number, ry: number, rot = 0) {
-    ctx.save();
-    ctx.translate(cx * W, cy * H);
-    ctx.rotate(rot);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, rx * W, ry * H, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+  ocean.addColorStop(0, '#0b2240'); ocean.addColorStop(0.5, '#0d2d55'); ocean.addColorStop(1, '#0b2240');
+  ctx.fillStyle = ocean; ctx.fillRect(0, 0, W, H);
+  function blob(cx: number, cy: number, rx: number, ry: number) {
+    ctx.beginPath(); ctx.ellipse(cx*W, cy*H, rx*W, ry*H, 0, 0, Math.PI*2); ctx.fill();
   }
-
-  // ── Landmasses (equirectangular, rough but recognisable) ──
-  // North America
   ctx.fillStyle = '#1e4020';
-  land(0.14, 0.28, 0.10, 0.22);
-  land(0.10, 0.22, 0.05, 0.12);   // Alaska bump
-  land(0.20, 0.40, 0.06, 0.10);   // Mexico/Central
-  // Greenland
-  ctx.fillStyle = '#c8daea';
-  land(0.28, 0.12, 0.04, 0.08);
-  // South America
-  ctx.fillStyle = '#1e4020';
-  land(0.18, 0.60, 0.07, 0.20);
-  // Europe
-  land(0.47, 0.20, 0.05, 0.14);
-  // Africa
-  land(0.48, 0.52, 0.07, 0.24);
-  land(0.50, 0.30, 0.04, 0.10);   // North Africa
-  // Arabian Peninsula — desert colour
-  ctx.fillStyle = '#4a3a18';
-  land(0.57, 0.35, 0.04, 0.10);
-  // India
-  ctx.fillStyle = '#1e4020';
-  land(0.63, 0.44, 0.03, 0.10);
-  // Asia (main body)
-  land(0.69, 0.22, 0.20, 0.26);
-  // SE Asia + Indonesia
-  land(0.76, 0.42, 0.08, 0.10);
-  land(0.82, 0.50, 0.05, 0.06);
-  // Australia
-  land(0.82, 0.63, 0.06, 0.09);
-  // Japan / islands
-  land(0.90, 0.28, 0.02, 0.06, 0.3);
-
-  // ── Desert overlay (Sahara / Central Asia) ────────────────
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = '#5a4222';
-  land(0.47, 0.33, 0.09, 0.08);   // Sahara
-  land(0.66, 0.28, 0.12, 0.10);   // Central Asia steppes
-  ctx.globalAlpha = 1.0;
-
-  // ── Polar ice caps ────────────────────────────────────────
-  const arcticGrad = ctx.createLinearGradient(0, 0, 0, 0.12 * H);
-  arcticGrad.addColorStop(0, '#d8e8f8');
-  arcticGrad.addColorStop(1, 'rgba(200,220,240,0)');
-  ctx.fillStyle = arcticGrad;
-  ctx.fillRect(0, 0, W, 0.12 * H);
-
-  const antarcticGrad = ctx.createLinearGradient(0, 0.88 * H, 0, H);
-  antarcticGrad.addColorStop(0, 'rgba(200,220,240,0)');
-  antarcticGrad.addColorStop(1, '#d8e8f8');
-  ctx.fillStyle = antarcticGrad;
-  ctx.fillRect(0, 0.88 * H, W, 0.12 * H);
-
-  // ── Subtle atmospheric haze bands ────────────────────────
-  ctx.globalAlpha = 0.06;
-  for (let i = 0; i < 8; i++) {
-    const y = (i / 8) * H;
-    ctx.fillStyle = i % 2 === 0 ? '#1a4060' : '#0a1a30';
-    ctx.fillRect(0, y, W, H / 8);
-  }
-  ctx.globalAlpha = 1.0;
-
+  blob(0.14,0.28,0.10,0.22); blob(0.18,0.60,0.07,0.20);
+  blob(0.47,0.20,0.05,0.14); blob(0.48,0.52,0.07,0.24); blob(0.50,0.30,0.04,0.10);
+  blob(0.63,0.44,0.03,0.10); blob(0.69,0.22,0.20,0.26); blob(0.82,0.63,0.06,0.09);
+  ctx.fillStyle = '#c8daea'; blob(0.28,0.12,0.04,0.08);
+  ctx.fillStyle = '#d8e8f8'; ctx.fillRect(0,0,W,0.08*H); ctx.fillRect(0,0.88*H,W,0.12*H);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+// Option A: load static Blue Marble texture (with canvas fallback)
+function loadStaticEarth(mat: THREE.MeshPhongMaterial) {
+  const loader = new THREE.TextureLoader();
+  loader.load(
+    '/earth.jpg',
+    tex => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      mat.map = tex;
+      mat.needsUpdate = true;
+      setEarthStatusLabel('');
+    },
+    undefined,
+    () => { /* fallback canvas already applied */ },
+  );
+  loader.load(
+    '/earth_specular.jpg',
+    tex => { mat.specularMap = tex; mat.needsUpdate = true; },
+  );
+}
+
+// Option B: assemble today's Earth from NASA GIBS WMTS tiles
+// Uses MODIS Terra TrueColor, EPSG:4326, 250m matrix set, TileMatrix=1
+// → 3 cols × 2 rows, each tile 512×512 px → 1536×1024 canvas
+// URL template from GetCapabilities:
+//   .../default/{date}/250m/{TileMatrix}/{TileRow}/{TileCol}.jpeg
+const GIBS_LAYER  = 'MODIS_Terra_CorrectedReflectance_TrueColor';
+const GIBS_MATRIX = '250m';
+const GIBS_ZOOM   = 1;   // TileMatrix=1: 3 cols × 2 rows
+const GIBS_COLS   = 3;
+const GIBS_ROWS   = 2;
+const GIBS_TILE   = 512;
+
+async function fetchLiveEarth(mat: THREE.MeshPhongMaterial): Promise<void> {
+  // Use yesterday's date (MODIS has ~1-day latency)
+  const now = new Date();
+  now.setDate(now.getDate() - 1);
+  const dateStr = now.toISOString().slice(0, 10);
+  setEarthStatusLabel(`LIVE  ${dateStr}`);
+
+  const W = GIBS_COLS * GIBS_TILE, H = GIBS_ROWS * GIBS_TILE;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  // Ocean fill while tiles load
+  ctx.fillStyle = '#0d2545'; ctx.fillRect(0, 0, W, H);
+  // Show partial canvas immediately
+  const partialTex = new THREE.CanvasTexture(canvas);
+  partialTex.colorSpace = THREE.SRGBColorSpace;
+  mat.map = partialTex; mat.specularMap = null; mat.needsUpdate = true;
+
+  const fetches: Promise<void>[] = [];
+  for (let row = 0; row < GIBS_ROWS; row++) {
+    for (let col = 0; col < GIBS_COLS; col++) {
+      const url = [
+        'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best',
+        GIBS_LAYER, 'default', dateStr, GIBS_MATRIX,
+        GIBS_ZOOM, row, col,
+      ].join('/') + '.jpeg';
+      fetches.push(
+        fetch(url)
+          .then(r => { if (!r.ok) throw new Error(r.status.toString()); return r.blob(); })
+          .then(blob => new Promise<void>(resolve => {
+            const img = new Image();
+            img.onload = () => {
+              ctx.drawImage(img, col * GIBS_TILE, row * GIBS_TILE, GIBS_TILE, GIBS_TILE);
+              partialTex.needsUpdate = true;
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = URL.createObjectURL(blob);
+          }))
+          .catch(() => {/* silently skip failed tiles */}),
+      );
+    }
+  }
+
+  await Promise.all(fetches);
+  partialTex.needsUpdate = true;
+  setEarthStatusLabel(`LIVE  ${dateStr}  ✓`);
+}
+
+// Status label shown next to the live button
+function setEarthStatusLabel(msg: string) {
+  const el = document.getElementById('earth-status');
+  if (el) el.textContent = msg;
 }
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
@@ -179,18 +198,16 @@ scene.add(rim);
   scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.05, sizeAttenuation: false })));
 }
 
-// Earth — procedural texture
-const earthTex = makeEarthTexture();
-const earth = new THREE.Mesh(
-  new THREE.SphereGeometry(EARTH_R, 64, 32),
-  new THREE.MeshPhongMaterial({
-    map: earthTex,
-    specular: new THREE.Color(0x113355),
-    shininess: 18,
-    emissive: new THREE.Color(0x060e1a),
-    emissiveIntensity: 0.25,
-  }),
-);
+// Earth — start with procedural texture, async-replace with real texture
+const earthMat = new THREE.MeshPhongMaterial({
+  map: makeProceduralEarth(),
+  specular: new THREE.Color(0x224466),
+  shininess: 20,
+  emissive: new THREE.Color(0x050d1a),
+  emissiveIntensity: 0.2,
+});
+const earth = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, 64, 32), earthMat);
+loadStaticEarth(earthMat);  // Option A kicks off immediately
 scene.add(earth);
 
 // City lights (faint emissive sphere, only on night side)
@@ -791,6 +808,10 @@ scrubber.addEventListener('input', () => {
 });
 
 speedSel.addEventListener('change', () => { speed = parseFloat(speedSel.value); });
+
+document.getElementById('live-btn')?.addEventListener('click', () => {
+  fetchLiveEarth(earthMat).catch(console.warn);
+});
 
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;

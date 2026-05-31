@@ -154,6 +154,20 @@
       font-family: inherit; font-size: 13px;
       cursor: pointer; border-radius: 4px; flex-shrink: 0;
     }
+    #live-btn {
+      background: none;
+      border: 1px solid rgba(0,255,136,0.5);
+      color: #00ff88; padding: 6px 12px;
+      font-family: inherit; font-size: 12px; letter-spacing: 0.1em;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #live-btn:hover { background: rgba(0,255,136,0.12); }
+    #earth-status {
+      font-size: 10px; letter-spacing: 0.08em;
+      color: rgba(0,255,136,0.6); min-width: 120px;
+      flex-shrink: 0;
+    }
 
     /* ── CSS2D labels (projector-sized) ─────────────────────────────────── */
     .sat-label {
@@ -178,7 +192,7 @@
       white-space: nowrap; pointer-events: none;
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-gqiiDbYQ.js"></script>
+  <script type="module" crossorigin src="/assets/index-B9FYr4fH.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -216,6 +230,8 @@
       <option value="30">30×</option>
       <option value="60">60×</option>
     </select>
+    <button id="live-btn">🛰 LIVE</button>
+    <span id="earth-status"></span>
   </div>
 
 </body>
