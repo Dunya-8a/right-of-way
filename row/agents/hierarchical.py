@@ -155,7 +155,14 @@ def run_hierarchical(
             from_id=mover,
             to_id=COORDINATOR_ID,
             type="propose",
-            payload={"proposal": proposal.model_dump(), "rationale": reason},
+            payload={
+                "proposal": proposal.model_dump(),
+                # The burn is administratively sent to the coordinator, but it is
+                # aimed at the conjunction partner. Name that partner explicitly so
+                # WS3's Timeline proposal-event mapping uses it (not "coordinator").
+                "recipient_id": other,
+                "rationale": reason,
+            },
         ),
         NegotiationMsg(
             from_id=COORDINATOR_ID,

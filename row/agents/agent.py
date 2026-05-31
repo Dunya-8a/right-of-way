@@ -175,6 +175,10 @@ class Agent:
                     type="propose",
                     payload={
                         "proposal": proposal.model_dump(),
+                        # recipient_id = the conjunction partner this burn is aimed
+                        # at (== to_id here, but named explicitly so WS3's Timeline
+                        # proposal-event mapping needn't infer it; see decisions.md).
+                        "recipient_id": to,
                         "rationale": decision.rationale,
                     },
                 ),

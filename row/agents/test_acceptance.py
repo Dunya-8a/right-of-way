@@ -97,6 +97,24 @@ def test_transcript_shows_high_priority_yielding():
     assert "sat_A" in cannot
 
 
+@pytest.mark.parametrize("topology", ["swarm", "hierarchical"])
+def test_propose_carries_recipient_id_of_partner(topology):
+    """Every propose names the conjunction PARTNER as recipient_id (for WS3/viz).
+
+    In hierarchical the message is administratively addressed to the coordinator,
+    so to_id != partner — recipient_id must still be the real partner (sat_A).
+    """
+    scenario = generate_scenario()
+    result = make_negotiator(topology).negotiate(_context(scenario, PRIMARY, topology))
+    proposes = [m for m in result.messages if m.type == "propose"]
+    assert proposes, "expected at least one propose message"
+    for m in proposes:
+        rid = (m.payload or {}).get("recipient_id")
+        assert rid == "sat_A", (
+            f"{topology}: propose.recipient_id should be the partner sat_A, got {rid}"
+        )
+
+
 def test_full_arc_resolves_and_catches_secondary():
     """End-to-end via the demo driver: both topologies clear, secondary beat fires."""
     from row.agents import demo
