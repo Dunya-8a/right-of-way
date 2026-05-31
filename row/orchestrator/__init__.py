@@ -8,8 +8,9 @@ Public seam (shared contract, safe to import from any session):
         Negotiator, NegotiationContext, NegotiationResult, Topology,
     )
 
-The run-loop entry point (``run``) is added by the WS3 build; import it as
-``from row.orchestrator import run`` once that lands.
+Run loop entry point:
+    from row.orchestrator import run
+    result = run(topology="hierarchical")   # emits web/public/timeline.json
 """
 
 from __future__ import annotations
@@ -20,10 +21,13 @@ from .interfaces import (
     Negotiator,
     Topology,
 )
+from .loop import RunResult, run
 
 __all__ = [
     "Negotiator",
     "NegotiationContext",
     "NegotiationResult",
     "Topology",
+    "run",
+    "RunResult",
 ]
