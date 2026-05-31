@@ -129,27 +129,28 @@ def generate_scenario() -> Scenario:
         priority=5,
     )
 
-    # --- Filler: real constellation flavor, parked far from the crossing at TCA_S
-    #     (they cross the axis at different points / planes), so they don't perturb
-    #     the forced trade. WS1's screener is the final word on any interactions.
+    # --- Filler: real constellation flavor on DISTINCT altitude shells (R-300,
+    #     R+300, R-600 km). Different radii => min separation is the radius gap
+    #     (>=290 km), so they never conjoin with each other or the principals and
+    #     the only conjunctions in the scene are the forced-trade arc (A/B, B/C).
     sat_d = SpaceObject(
         id="sat_D",
         type="sat",
-        state=_crossing_orbit_state(_R, _neg(_X), _Y, TCA_S),  # crosses at (-R,0,0)
+        state=_crossing_orbit_state(_R - 300.0, _neg(_X), _Y, TCA_S),  # lower shell
         fuel_budget_dv=0.050,
         priority=4,
     )
     sat_e = SpaceObject(
         id="sat_E",
         type="sat",
-        state=_crossing_orbit_state(_R, _Y, _neg(_X), TCA_S),  # crosses at (0,R,0)
+        state=_crossing_orbit_state(_R + 300.0, _Y, _neg(_X), TCA_S),  # higher shell
         fuel_budget_dv=0.050,
         priority=6,
     )
     debris_1 = SpaceObject(
         id="debris_1",
         type="debris",
-        state=_crossing_orbit_state(_R, _Z, _X, TCA_S),  # crosses at (0,0,R)
+        state=_crossing_orbit_state(_R - 600.0, _Z, _X, TCA_S),  # lowest shell
         fuel_budget_dv=0.0,  # debris never maneuvers
         priority=0,
     )
