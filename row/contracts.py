@@ -102,6 +102,11 @@ class NegotiationMsg(BaseModel):
 class FrameObject(BaseModel):
     id: str
     r: Vec3
+    v: Optional[Vec3] = Field(
+        default=None,
+        description="ECI velocity [vx, vy, vz] in km/s. Optional; lets the viz "
+        "extrapolate 'ghost orbit' arcs (old vs new trajectory) at a maneuver.",
+    )
 
 
 class Frame(BaseModel):

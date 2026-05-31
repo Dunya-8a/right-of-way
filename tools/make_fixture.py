@@ -56,12 +56,32 @@ def pos(obj_id: str, t: float) -> list[float]:
     return [0.0, c, s]
 
 
+def vel(obj_id: str, t: float) -> list[float]:
+    """Faked tangential velocity (d/dt of pos) so frames carry optional ECI v."""
+    o = ORBITS[obj_id]
+    w = W * o["w"]
+    ang = o["phase"] + w * t
+    dc, ds = -_R * math.sin(ang) * w, _R * math.cos(ang) * w  # km/s
+    plane = o["plane"]
+    if plane == "xy":
+        return [dc, ds, 0.0]
+    if plane == "xz":
+        return [dc, 0.0, ds]
+    # "zx"
+    return [0.0, dc, ds]
+
+
 def build() -> Timeline:
     frames = []
     for k in range(0, 31):  # t = 0,120,...,3600
         t = k * 120.0
         frames.append(
-            {"t": t, "objects": [{"id": oid, "r": pos(oid, t)} for oid in ORBITS]}
+            {
+                "t": t,
+                "objects": [
+                    {"id": oid, "r": pos(oid, t), "v": vel(oid, t)} for oid in ORBITS
+                ],
+            }
         )
 
     events = [
@@ -82,6 +102,7 @@ def build() -> Timeline:
             "type": "proposal",
             "data": {
                 "proposer_id": "sat_B",
+                "recipient_id": "sat_A",
                 "dv_vector": [0.0, 0.0, 0.012],
                 "t_burn": 720.0,
                 "est_dv_cost": 0.012,
@@ -114,6 +135,7 @@ def build() -> Timeline:
             "type": "proposal",
             "data": {
                 "proposer_id": "sat_B",
+                "recipient_id": "sat_C",
                 "dv_vector": [0.0, 0.0, 0.007],
                 "t_burn": 900.0,
                 "est_dv_cost": 0.007,

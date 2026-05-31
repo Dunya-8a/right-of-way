@@ -63,6 +63,7 @@ export interface NegotiationMsg {
 export interface FrameObject {
   id: string;
   r: Vec3;
+  v?: Vec3 | null; // ECI velocity km/s; optional, enables ghost-orbit extrapolation
 }
 
 export interface Frame {

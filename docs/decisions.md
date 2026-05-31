@@ -86,6 +86,15 @@ WS3 writes a `Timeline` JSON (same schema as `web/sample_timeline.json`) to
 `fetch('/timeline.json')`). `web/sample_timeline.json` stays as the static dev
 fixture. The emitted file is a runtime artifact (gitignored).
 
+Contract additions (2026-05-31, from WS5, backward-compatible):
+- `frames[].objects[].v` — optional ECI velocity (km/s) on each frame object, so
+  the viz can extrapolate ghost-orbit arcs at a maneuver. Optional (defaults
+  null); only WS3 (producer) and WS5 (consumer) touch it. WS1/WS2 unaffected.
+- Proposal events SHOULD include `data.recipient_id` (the negotiation partner the
+  proposal is aimed at) alongside `proposer_id`. No schema change — `events[].data`
+  is an open dict — just a convention so the viz needn't infer the target.
+- `meta.epoch` is already present; absolute UTC currently unused by the viz.
+
 ## Workflow note
 
 Solo human (no human teammates) coordinating multiple parallel Claude Code
