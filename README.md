@@ -60,6 +60,9 @@ uv sync
 # the deterministic referee — propagation, conjunction screening, the avoidance burn
 uv run python -m row.physics.demo
 
+# the agents negotiating directly — both topologies + the forced-trade transcript
+uv run python -m row.agents.demo
+
 # the full verify-and-repair run — emits web/public/timeline.json (the run shown above)
 uv run python -m row.orchestrator            # add --topology swarm to switch topologies
 
@@ -80,17 +83,21 @@ row/
 │   ├── core.py             #   PhysicsCore: propagate / screen_conjunctions / apply_maneuver
 │   ├── screening.py        #   coarse sampling + golden-section refinement per close approach
 │   └── mcp_server.py       #   ← the same core exposed as a real MCP tool server
-└── orchestrator/           # the verify-and-repair run loop
-    ├── loop.py             #   detect → negotiate → commit → RE-SCREEN → repeat; emits Timeline
-    └── interfaces.py       #   the Negotiator seam the agent layer plugs into
+├── orchestrator/           # the verify-and-repair run loop
+│   ├── loop.py             #   detect → negotiate → commit → RE-SCREEN → repeat; emits Timeline
+│   └── interfaces.py       #   the Negotiator seam the agents plug into
+└── agents/                 # the LLM agent layer — peer-to-peer A2A negotiation
+    ├── swarm.py            #   emergent peer-to-peer negotiation, no coordinator
+    ├── hierarchical.py     #   central-coordinator fallback
+    └── llm.py              #   ClaudeBrain (Sonnet 4.6) + deterministic MockBrain fallback
 web/                        # three.js + Vite 3D orbit viz (real NASA Blue Marble / live GIBS tiles)
 ```
 
-> **Repo layout note:** this `main` carries the physics core, the real MCP server, and the
-> verify-and-repair orchestrator. The peer-to-peer **LLM agent layer** (Claude-backed `swarm`
-> + `hierarchical` negotiators, A2A message bus) lives on branch
-> [`ws2-agents`](../../tree/ws2-agents/row/agents) and plugs into the `Negotiator` seam above —
-> the four workstreams were built in parallel git worktrees and are being merged down.
+> **Built in parallel.** The four workstreams — physics core, MCP server, the Claude-backed
+> A2A agent layer, and the verify-and-repair orchestrator — were developed concurrently in
+> separate git worktrees against locked `pydantic` contracts, then merged to `main`. The
+> orchestrator runs the real peer-to-peer agents by default and falls back to deterministic
+> reference negotiators if the agent layer is unavailable, so the pipeline always runs.
 
 ## Sponsor tools
 
