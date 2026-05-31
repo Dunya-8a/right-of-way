@@ -1,137 +1,103 @@
-# Right of Way (`row`)
+# Right of Way
 
-A decentralized collision-avoidance harness. Satellite-agents detect orbital
-near-misses (conjunctions), negotiate avoidance maneuvers peer-to-peer over
-**A2A**, and a deterministic **physics core** acts as ground-truth referee —
-verifying every proposed maneuver and catching when a fix creates a *new*
-near-miss, then triggering re-negotiation. The same mechanism is a general
-coordination layer for any fleet of autonomous agents owned by different
-operators (drones / UTM, AVs, autonomous vessels).
+**There's no air-traffic control in space.** When two satellites from different operators drift onto a collision course, nobody is in charge — each one only knows its own fuel, its own mission, and wants the *other* one to move. **Right of Way turns the satellites into AI agents that negotiate their own collision avoidance — peer-to-peer, no central planner — refereed by a deterministic physics engine that won't let them lie.**
 
-## Shared vocabulary (read this first — one paragraph)
+![Right of Way — live negotiation: two active conjunctions, the agents' burn proposals streaming into the event log, and maneuver vectors on the satellites](docs/images/negotiation.png)
 
-A **Scenario** is a set of **SpaceObject**s (satellites we control + debris we
-avoid), each with an ECI **State** (position `r`, velocity `v`), a
-`fuel_budget_dv` (remaining delta-v; ~0 means it physically cannot move), and an
-integer `priority` (higher = more right of way). The world is **two-body**:
-every object is defined by its Cartesian `state.r` / `state.v` in the ECI frame;
-`tle` stays optional and is **unused** for the synthetic demo. The
-**PhysicsCore** is the deterministic referee — *no LLM* — that can `propagate`
-objects forward, `screen_conjunctions` to find close approaches under
-`conjunction_threshold_km`, and `apply_maneuver` to produce a new post-burn
-Scenario. A **Conjunction** is a predicted close approach (`tca`,
-`miss_distance_km`, `rel_speed`). Agents resolve conjunctions by exchanging
-**NegotiationMsg**s (A2A) carrying **ManeuverProposal**s (a `dv_vector`, when to
-burn, its cost, and a `rationale`). The whole run is recorded as a **Timeline**
-— ordered `frames` (object positions over time) plus `events`
-(`conjunction_detected`, `proposal`, `maneuver_committed`, `new_conjunction`,
-`resolved`), with `Timeline.meta` carrying `frame: "ECI"`, a `units` block, and
-`dt_seconds` (frame cadence) so viz and physics agree on playback — which the
-visualization plays back with zero dependency on the sim.
+> *Built at the **Multi-Agent Orchestration Build Day** · The Engine, Cambridge MA · May 31, 2026.*
 
-**Frame & units (locked — every session inherits these):** the frame is
-**Earth-Centered Inertial (ECI)** everywhere. Distance = **km**, velocity =
-**km/s**, `dv_vector` and `fuel_budget_dv` = **km/s**, and `t` / `tca` /
-`t_burn` / `screen_window_s` = **seconds from `epoch`**. Realistic LEO scale:
-orbit radius ≈ **6,700–7,200 km** (the demo sits at ~6,878 km, i.e. ~500 km
-altitude), so a viz built against the fixture matches real physics output later.
+---
 
-## What WS0 (this foundation) ships
+## The problem
 
-- `row/contracts.py` — the data contracts as pydantic v2 models (source of truth).
-- `web/types.ts` — the matching TypeScript types (kept in lockstep).
-- `row/physics.py` — `PhysicsCore` **interface only** (signatures + docstrings,
-  every method raises `NotImplementedError`). WS1 implements the bodies.
-- `row/scenario.py` — `generate_scenario()`, the 6-object LEO constellation with
-  the injected **forced-trade** conjunction (see below).
-- `web/sample_timeline.json` — a hand-faked Timeline that plays the full demo
-  arc so the viz session can start with **zero dependencies**. Regenerate with
-  `python tools/make_fixture.py`.
+Computing a *single* satellite's avoidance burn is solved, deterministic math — you should never want an LLM doing orbital mechanics. The hard part is the **coupling between operators who share no central authority, no shared objective function, and won't take each other's math on faith.** One satellite's dodge can shove it into a *third* satellite's path. That isn't a computation — it's a **negotiation under partial information with conflicting objectives.** Which is exactly what multi-agent systems are for.
 
-### The forced-trade scenario (the whole point of the demo)
+The same mechanism generalizes to any fleet with no central boss: drones (the FAA's decentralized UTM / Part 108 framework lands ~2026), self-driving cars, autonomous ships.
 
-- **sat_A** — LOW priority, `fuel_budget_dv ≈ 0` → physically *cannot* maneuver.
-- **sat_B** — HIGH priority, has fuel, on a near-miss course with sat_A. The
-  naive rule "lowest priority yields" orders sat_A to move, but it can't →
-  **sat_B is forced to trade** despite outranking A. This is the proof the
-  agents are load-bearing, not a priority `if`-statement.
-- **sat_C** — placed just off sat_B's most obvious avoidance direction, so when
-  B burns it trends toward C → a likely **secondary** conjunction that triggers
-  the re-negotiation beat.
-- Plus filler `sat_D`, `sat_E`, `debris_1` so it reads like a real constellation.
+## How it works
 
-## Setup
+```
+        ┌─────────── verify-and-repair loop ───────────┐
+        │                                               │
+  screen for      negotiate            commit        RE-SCREEN
+  conjunctions ─▶ (A2A, peer-to-peer) ─▶ maneuver ─▶ (physics) ──┐
+        ▲                                                        │
+        └──────── new conjunction? back to the table ◀──────────┘
+                          ↓ provably clear
+                       emit Timeline → 3D viz
+```
 
-Python (using [uv](https://docs.astral.sh/uv/)):
+- **A2A** — agents negotiate by passing `propose / counter / accept / yield` messages. The bus just routes; the **agents** decide who moves.
+- **MCP** — the physics referee is a real [FastMCP](https://modelcontextprotocol.io) server exposing `propagate / screen_conjunctions / apply_maneuver` as agent-callable tools. Agents call ground-truth orbital mechanics instead of guessing.
+- **Two topologies, one flag** — runs as an emergent peer-to-peer **swarm** *or* a **hierarchical** coordinator. Swarm stalls → fall back to hierarchical → flagged safe no-op. The demo can't hard-fail.
+- **Verifier-first** — LLM-agents reason about *intent, priority, and strategy*; the deterministic core owns *feasibility* (exact two-body propagation via universal variables, conjunction screening, fuel accounting). Knowing what to delegate to the model vs. to deterministic compute **is** the design.
+
+## The demo that proves the agents are load-bearing
+
+The naive rule is *"lowest-priority satellite yields."* So we broke it: the lowest-priority satellite (`sat_A`) is **out of fuel and physically cannot move**, forcing the higher-priority `sat_B` to give up right-of-way and dodge anyway. Nobody hard-codes this — `sat_A` says "I can't move," `sat_B` hears it and concedes. The trade **emerges from the conversation.** (A test proves that giving `sat_A` fuel flips who moves — so it's negotiation, not an `if`-statement.)
+
+Then `sat_B`'s dodge nearly clips a *third* satellite, the re-screen catches it, and they renegotiate. Here's a real run (`python -m row.orchestrator`):
+
+```
+topology=hierarchical  converged=True  iterations=2  total_dv=20.0 m/s  rounds=2
+events (7):
+  t=    0.0  conjunction_detected   sat_A / sat_B   (miss 3.0 km)
+  t=    0.0  proposal
+  t=  240.0  maneuver_committed     sat_B  Δv 0.010 km/s
+  t=  240.0  new_conjunction        sat_B / sat_C   (miss 1.5 km)   ← the fix created a new risk
+  t=  240.0  proposal
+  t=  335.8  maneuver_committed     sat_C  Δv 0.010 km/s
+  t=  879.6  resolved                                               ← provably clear
+```
+
+![Right of Way — overview: the forced-trade constellation over a live NASA Earth, all clear before the first conjunction](docs/images/overview.png)
+
+## Run it
 
 ```bash
-uv sync                    # creates .venv from pyproject.toml
-uv run python -c "from row import generate_scenario; print(generate_scenario())"
-uv run python tools/make_fixture.py        # regenerate the viz fixture
+uv sync
+
+# the deterministic referee — propagation, conjunction screening, the avoidance burn
+uv run python -m row.physics.demo
+
+# the full verify-and-repair run — emits web/public/timeline.json (the run shown above)
+uv run python -m row.orchestrator            # add --topology swarm to switch topologies
+
+# the physics core as a real MCP server (stdio transport)
+uv run python -m row.physics.mcp_server
+
+# the 3D visualization — plays back the emitted Timeline
+cd web && pnpm install && pnpm dev
 ```
 
-Web types (using [pnpm](https://pnpm.io/)):
-
-```bash
-cd web
-pnpm install
-pnpm typecheck             # tsc --noEmit over the shared types
-```
-
-## How the other five sessions import this
-
-```python
-# WS1 — Physics Core: implement the bodies of these.
-from row.physics import PhysicsCore, MU_EARTH
-from row import Scenario, Conjunction, State
-
-# WS2 — Agent + Negotiation:
-from row import (
-    generate_scenario, Scenario, SpaceObject,
-    Conjunction, ManeuverProposal, NegotiationMsg,
-)
-from row.physics import PhysicsCore   # call it as the referee
-
-# WS3 — Orchestrator (the run loop): pulls everything together and EMITS a Timeline.
-from row import (
-    generate_scenario, PhysicsCore,
-    Conjunction, ManeuverProposal, NegotiationMsg,
-    Timeline, Frame, FrameObject, TimelineEvent,
-)
-
-# WS4 — Weave: wrap WS2/WS3 callables with @weave.op(); read the same contracts.
-from row import Scenario, Conjunction, ManeuverProposal, Timeline
-```
-
-```ts
-// WS5 — Visualization: import the types and play back the fixture. No sim needed.
-import type { Timeline, Frame, SpaceObject, Conjunction } from "./types";
-import sample from "./sample_timeline.json";
-// JSON arrays infer as number[]; the unknown-hop is the standard cast to the
-// tuple-typed (Vec3) Timeline. Needs "resolveJsonModule": true (set in tsconfig).
-const timeline = sample as unknown as Timeline;
-```
-
-**Contract discipline:** if you must change a field, change it in *both*
-`row/contracts.py` and `web/types.ts`, regenerate the fixture, and tell the room.
-Everything else is built against the contract, not against running code.
-
-## File tree
+## Architecture
 
 ```
-.
-├── README.md
-├── pyproject.toml              # uv / packaging; physics deps are an extra
-├── row/                        # the Python package (foundation)
-│   ├── __init__.py             # re-exports the public API
-│   ├── contracts.py            # pydantic models — SOURCE OF TRUTH
-│   ├── physics.py              # PhysicsCore INTERFACE ONLY (WS1 implements)
-│   └── scenario.py             # generate_scenario() + forced-trade injection
-├── tools/
-│   └── make_fixture.py         # regenerates web/sample_timeline.json
-└── web/                        # viz workspace (WS5)
-    ├── package.json            # pnpm; typescript devDep
-    ├── tsconfig.json
-    ├── types.ts                # TS mirror of contracts.py
-    └── sample_timeline.json    # dependency-free demo-arc fixture
+row/
+├── contracts.py            # pydantic v2 data models — the single source of truth
+├── scenario.py             # generate_scenario() — the forced-trade constellation
+├── physics/                # the deterministic referee (NumPy, two-body universal variables)
+│   ├── core.py             #   PhysicsCore: propagate / screen_conjunctions / apply_maneuver
+│   ├── screening.py        #   coarse sampling + golden-section refinement per close approach
+│   └── mcp_server.py       #   ← the same core exposed as a real MCP tool server
+└── orchestrator/           # the verify-and-repair run loop
+    ├── loop.py             #   detect → negotiate → commit → RE-SCREEN → repeat; emits Timeline
+    └── interfaces.py       #   the Negotiator seam the agent layer plugs into
+web/                        # three.js + Vite 3D orbit viz (real NASA Blue Marble / live GIBS tiles)
 ```
+
+> **Repo layout note:** this `main` carries the physics core, the real MCP server, and the
+> verify-and-repair orchestrator. The peer-to-peer **LLM agent layer** (Claude-backed `swarm`
+> + `hierarchical` negotiators, A2A message bus) lives on branch
+> [`ws2-agents`](../../tree/ws2-agents/row/agents) and plugs into the `Negotiator` seam above —
+> the four workstreams were built in parallel git worktrees and are being merged down.
+
+## Sponsor tools
+
+- **W&B Weave** — traces the full multi-agent run (every `negotiate()`, every MCP physics call, every repair iteration) so an opaque agent loop becomes a transcript you can read and evaluate.
+- **Anthropic Claude (Sonnet 4.6)** — the reasoning core of each satellite-agent (tool-use + prompt caching, with a deterministic offline fallback so the demo never breaks). Claude Code was also the *build* harness: parallel agent sessions, one per workstream, each in its own worktree.
+- **MCP** — the physics referee as a real FastMCP tool server, the thing that keeps the LLM-agents honest.
+
+---
+
+*Right of Way is a research demonstrator of a coordination mechanism for a real, unsolved gap — cross-operator collision avoidance with no shared maneuvering authority — not a flight-ready system.*
