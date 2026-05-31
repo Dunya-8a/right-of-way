@@ -2,12 +2,19 @@
   "name": "row-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Right of Way — web/viz workspace (WS5). Foundation ships only the shared types + sample fixture.",
+  "description": "Right of Way — WS5 Visualization",
   "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "three": "^0.168.0"
+  },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vite": "^5.4.0"
   }
 }
