@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Right of Way — Orbital Negotiation</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #050510; }
+    body { font-family: 'Courier New', Courier, monospace; color: #fff; }
+
+    #canvas { display: block; position: absolute; top: 0; left: 0; }
+    #label-root { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+    #header {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 14px 24px 20px;
+      background: linear-gradient(to bottom, rgba(5,5,16,0.96) 60%, transparent);
+      display: flex; justify-content: space-between; align-items: flex-start;
+      pointer-events: none;
+    }
+    #title {
+      font-size: 22px; letter-spacing: 0.25em;
+      color: #00d4ff; text-shadow: 0 0 14px #00d4ff88;
+    }
+    #subtitle {
+      font-size: 10px; letter-spacing: 0.15em;
+      color: rgba(0,212,255,0.45); margin-top: 3px;
+    }
+    #drop-hint {
+      font-size: 10px; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.25);
+      align-self: center;
+    }
+
+    /* ── Phase badge ─────────────────────────────────────────────────────── */
+    #phase-badge {
+      position: absolute; top: 72px; left: 24px;
+      padding: 8px 16px;
+      background: rgba(5,5,16,0.88);
+      border: 1px solid rgba(0,255,136,0.35);
+      border-radius: 3px;
+      display: flex; align-items: center; gap: 10px;
+      transition: border-color 0.3s;
+    }
+    #phase-dot {
+      width: 11px; height: 11px; border-radius: 50%;
+      background: #00ff88; box-shadow: 0 0 9px #00ff88;
+      flex-shrink: 0; transition: background 0.3s, box-shadow 0.3s;
+    }
+    #phase-text {
+      font-size: 12px; letter-spacing: 0.12em; color: #00ff88;
+      transition: color 0.3s;
+    }
+    #phase-badge.danger { border-color: rgba(255,32,32,0.5); }
+    #phase-badge.danger #phase-dot { background: #ff2020; box-shadow: 0 0 9px #ff2020; }
+    #phase-badge.danger #phase-text { color: #ff5050; }
+
+    /* ── Event log ───────────────────────────────────────────────────────── */
+    #log-panel {
+      position: absolute; top: 72px; right: 24px;
+      width: 320px;
+      background: rgba(5,5,16,0.88);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 3px;
+      display: flex; flex-direction: column;
+      max-height: calc(100vh - 160px);
+    }
+    #log-header {
+      padding: 7px 12px; font-size: 10px; letter-spacing: 0.18em;
+      color: rgba(0,212,255,0.5);
+      border-bottom: 1px solid rgba(0,212,255,0.15);
+      flex-shrink: 0;
+    }
+    #event-log {
+      padding: 6px; overflow-y: auto; flex: 1;
+    }
+    #event-log::-webkit-scrollbar { width: 4px; }
+    #event-log::-webkit-scrollbar-track { background: transparent; }
+    #event-log::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.25); border-radius: 2px; }
+    .log-entry {
+      font-size: 10px; padding: 4px 8px; margin: 2px 0;
+      border-left: 2px solid; border-radius: 1px;
+      line-height: 1.5; letter-spacing: 0.02em;
+    }
+    .log-entry.safe    { color: #66ffb0; border-color: #00ff88; background: rgba(0,255,136,0.06); }
+    .log-entry.danger  { color: #ff7070; border-color: #ff2020; background: rgba(255,32,32,0.07); }
+    .log-entry.proposal{ color: #ffcc66; border-color: #ffaa00; background: rgba(255,170,0,0.07); }
+    .log-entry.maneuver{ color: #ffa060; border-color: #ff6600; background: rgba(255,100,0,0.07); }
+    .log-entry.info    { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
+
+    /* ── Bottom controls ─────────────────────────────────────────────────── */
+    #controls {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 14px 24px 18px;
+      background: linear-gradient(to top, rgba(5,5,16,0.96) 60%, transparent);
+      display: flex; align-items: center; gap: 14px;
+    }
+    #play-btn {
+      background: none;
+      border: 1px solid #00d4ff;
+      color: #00d4ff;
+      font-size: 18px; line-height: 1;
+      width: 40px; height: 40px;
+      cursor: pointer; border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background 0.15s;
+    }
+    #play-btn:hover { background: rgba(0,212,255,0.14); }
+    #scrubber {
+      flex: 1; -webkit-appearance: none;
+      height: 3px; background: rgba(0,212,255,0.18);
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    #scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px; height: 13px;
+      background: #00d4ff; border-radius: 50%;
+      box-shadow: 0 0 7px #00d4ff;
+    }
+    #time-display {
+      font-size: 12px; color: #00d4ff;
+      letter-spacing: 0.06em; min-width: 72px; text-align: right;
+    }
+    #speed-select {
+      background: rgba(0,15,30,0.85);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #00d4ff; padding: 5px 8px;
+      font-family: inherit; font-size: 12px;
+      cursor: pointer; border-radius: 3px; flex-shrink: 0;
+    }
+
+    /* ── CSS2D labels ────────────────────────────────────────────────────── */
+    .sat-label {
+      color: rgba(0,212,255,0.75);
+      font-family: 'Courier New', monospace;
+      font-size: 10px; letter-spacing: 0.06em;
+      text-shadow: 0 0 5px rgba(0,212,255,0.8);
+      white-space: nowrap; pointer-events: none;
+    }
+    .conj-label {
+      color: #ff4040;
+      font-family: 'Courier New', monospace;
+      font-size: 13px; font-weight: bold; letter-spacing: 0.1em;
+      text-shadow: 0 0 10px #ff2020, 0 0 22px #ff202066;
+      white-space: nowrap; pointer-events: none;
+    }
+    .resolved-label {
+      color: #00ff88;
+      font-family: 'Courier New', monospace;
+      font-size: 13px; font-weight: bold; letter-spacing: 0.1em;
+      text-shadow: 0 0 10px #00ff88, 0 0 22px #00ff8866;
+      white-space: nowrap; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="label-root"></div>
+
+  <div id="header">
+    <div>
+      <div id="title">RIGHT OF WAY</div>
+      <div id="subtitle" id="scenario-name">Autonomous Orbital Negotiation</div>
+    </div>
+    <div id="drop-hint">DROP TIMELINE JSON TO REPLACE FIXTURE</div>
+  </div>
+
+  <div id="phase-badge">
+    <div id="phase-dot"></div>
+    <div id="phase-text">ALL CLEAR</div>
+  </div>
+
+  <div id="log-panel">
+    <div id="log-header">EVENT LOG</div>
+    <div id="event-log"></div>
+  </div>
+
+  <div id="controls">
+    <button id="play-btn">▶</button>
+    <input type="range" id="scrubber" min="0" max="1000" value="0" step="1" />
+    <div id="time-display">T+0s</div>
+    <select id="speed-select">
+      <option value="1">1×</option>
+      <option value="5">5×</option>
+      <option value="10" selected>10×</option>
+      <option value="30">30×</option>
+      <option value="60">60×</option>
+    </select>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
