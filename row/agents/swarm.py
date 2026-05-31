@@ -55,6 +55,19 @@ def run_swarm(
     )
     pair = (conjunction.a_id, conjunction.b_id)
 
+    # Defensive: a conjunction referencing an object not in the scenario (stale
+    # screen / trimmed object) must fail soft, not KeyError into WS3's loop.
+    missing = [pid for pid in pair if pid not in objects]
+    if missing:
+        _emit(log, "negotiation_error", topology="swarm", missing=missing)
+        return NegotiationOutcome(
+            committed=[],
+            transcript=[],
+            resolved=False,
+            rounds=0,
+            meta={"topology": "swarm", "error": f"unknown object ids: {missing}"},
+        )
+
     # Only satellites can negotiate; debris is a passive obstacle.
     negotiating = [pid for pid in pair if objects[pid].type == "sat"]
     agents: dict[str, Agent] = {}
@@ -137,12 +150,14 @@ def run_swarm(
 
     resolved = bool(committed)
 
-    # Fallback tie-break: proposals exist but none was accepted in time → take
-    # the cheapest (minimize total Δv); break ties toward the lower-priority sat.
+    # Fallback tie-break: proposals exist but none was accepted in time → honor
+    # right-of-way first (lower priority yields), then prefer the cheaper burn.
+    # Priority must lead: a cheaper burn from the *higher*-priority sat must not
+    # override the norm that the lower-priority party gives way.
     if not resolved and proposals_on_table:
         def _key(item):
             pid, prop = item
-            return (prop.est_dv_cost, objects[pid].priority)
+            return (objects[pid].priority, prop.est_dv_cost)
 
         pid, prop = min(proposals_on_table.items(), key=_key)
         committed = [prop]

@@ -11,7 +11,7 @@ forced-trade conjunction.
 ```bash
 # from the repo root, using the project venv
 python -m row.agents.demo            # prints both topologies' A2A transcripts
-python -m pytest row/agents/         # 8 acceptance tests
+python -m pytest row/agents/         # 12 acceptance tests
 ```
 
 `demo.py` uses `StubPhysics` to mimic WS3's verify-and-repair loop so the agent

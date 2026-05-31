@@ -96,6 +96,19 @@ def run_hierarchical(
         threshold_km if threshold_km is not None else scenario.conjunction_threshold_km
     )
 
+    # Defensive: fail soft (not KeyError) if the conjunction names an object the
+    # scenario doesn't contain — mirrors run_swarm.
+    missing = [pid for pid in (conjunction.a_id, conjunction.b_id) if pid not in objects]
+    if missing:
+        _emit(log, "negotiation_error", topology="hierarchical", missing=missing)
+        return NegotiationOutcome(
+            committed=[],
+            transcript=[],
+            resolved=False,
+            rounds=0,
+            meta={"topology": "hierarchical", "error": f"unknown object ids: {missing}"},
+        )
+
     _emit(
         log,
         "negotiation_start",

@@ -37,7 +37,7 @@ from row.orchestrator.interfaces import (
 from row.physics import PhysicsCore
 
 from .agent import DEFAULT_LEAD_S, DEFAULT_NEIGHBOR_RANGE_KM
-from .geometry import normalize, scale
+from .geometry import norm, normalize, scale
 from .hierarchical import run_hierarchical
 from .llm import IMMOBILE_DV, AgentBrain, default_brain
 from .outcome import NegotiationOutcome
@@ -76,8 +76,15 @@ def _verify_clears(
     the (possibly enlarged) proposal and whether physics says the pair is clear.
     Raises whatever the physics core raises (caller decides to skip on failure).
     """
-    direction = normalize(proposal.dv_vector) or (0.0, 0.0, 1.0)
+    # NOTE: a non-empty tuple is always truthy, so `normalize(...) or fallback`
+    # would never fire — check the magnitude explicitly.
+    unit = normalize(proposal.dv_vector)
+    direction = unit if norm(unit) > 0 else (0.0, 0.0, 1.0)
     base_mag = proposal.est_dv_cost or 0.0
+    # No magnitude to scale (e.g. a 0-fuel mover should never have committed):
+    # nothing useful to try — report not-cleared and let WS3 fall back.
+    if base_mag <= 0:
+        return proposal, False
     fuel_cap = max(fuel_budget_dv * 0.9, 0.0)
     last = proposal
     for factor in _GROW_FACTORS:
@@ -113,7 +120,7 @@ class _AdapterMixin:
     ) -> NegotiationResult:
         committed = outcome.committed
         converged = outcome.resolved
-        note = str(outcome.meta.get("topology", ""))
+        status = ""  # physics-verification status; topology is added to the note once below
 
         if self.verify and committed:
             objs = _objects(ctx)
@@ -134,24 +141,25 @@ class _AdapterMixin:
                     all_clear = all_clear and cleared
                 committed = verified
                 if all_clear:
-                    note = f"{note}; verified against physics".strip("; ")
+                    status = "verified against physics"
                 else:
                     converged = False
-                    note = (
-                        f"{note}; physics: burn does not clear within fuel — flagged "
-                        "for WS3 fallback"
-                    ).strip("; ")
+                    status = (
+                        "physics: burn does not clear within fuel — flagged for "
+                        "WS3 fallback"
+                    )
             except Exception:
                 # WS1 not landed (NotImplementedError) or core unavailable: trust
                 # the negotiated burn so the agent layer is testable standalone.
-                note = f"{note}; physics verification unavailable".strip("; ")
+                status = "physics verification unavailable"
 
         total_dv = sum(p.est_dv_cost for p in committed)
         movers = [p.proposer_id for p in committed]
-        full_note = (
-            f"[{outcome.meta.get('topology', '?')}] movers={movers} "
-            f"total_dv={total_dv:.4f} km/s; {note}"
-        )
+        topology = outcome.meta.get("topology", "?")
+        parts = [f"[{topology}] movers={movers} total_dv={total_dv:.4f} km/s"]
+        if status:
+            parts.append(status)
+        full_note = "; ".join(parts)
         return NegotiationResult(
             committed=committed,
             messages=outcome.transcript,

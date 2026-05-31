@@ -177,13 +177,31 @@ class MockBrain:
                 "I physically cannot maneuver. Requesting a trade.",
             )
 
-        # 5) I'm the higher-priority party and haven't heard the other can't move:
+        # 5) Higher-priority (or equal) and haven't heard the other can't move:
         #    assert right-of-way once, then wait for them to yield.
         if not ctx.i_asserted_row:
             return Decision(
                 "assert_row",
                 f"I ({ctx.self_id}) hold right-of-way (priority {ctx.self_priority} "
                 f"vs {ctx.counterpart_id}); requesting {ctx.counterpart_id} give way.",
+            )
+
+        # 6) Mutual assert with no new info = stalemate (e.g. EQUAL priority —
+        #    neither party is the lower one, so neither will yield by norm). Break
+        #    it deterministically without coordination: the satellite with the
+        #    lexicographically smaller id volunteers to maneuver. Each agent can
+        #    compute this from its own local view, so the resolution stays
+        #    emergent — and only one of the two ever volunteers, so we don't
+        #    double-burn. (Asymmetric priorities never reach here.)
+        if (
+            ctx.counterpart_asserted_row
+            and ctx.can_maneuver
+            and ctx.self_id < ctx.counterpart_id
+        ):
+            return Decision(
+                "take_duty",
+                f"Stalemate with {ctx.counterpart_id} (equal standing); I volunteer "
+                "to maneuver to break the deadlock.",
             )
         return Decision("wait", f"{ctx.self_id} holding, awaiting {ctx.counterpart_id}.")
 

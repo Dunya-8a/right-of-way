@@ -30,10 +30,15 @@ PRIMARY = Conjunction(
 def _context(scenario, conjunction, topology):
     objs = {o.id: o for o in scenario.objects}
     physics = StubPhysics(scenario, conjunction)
+    # involved is the subset of scenario.objects party to the conjunction (per the
+    # seam) — a conjunction naming a missing object simply yields a smaller subset.
+    involved = [
+        objs[i] for i in (conjunction.a_id, conjunction.b_id) if i in objs
+    ]
     return NegotiationContext(
         scenario=scenario,
         conjunction=conjunction,
-        involved=[objs[conjunction.a_id], objs[conjunction.b_id]],
+        involved=involved,
         physics=physics,
         threshold_km=scenario.conjunction_threshold_km,
         max_rounds=6,
@@ -68,7 +73,7 @@ def test_forced_trade_sat_b_maneuvers(topology):
 @pytest.mark.parametrize("topology", ["swarm", "hierarchical"])
 def test_lower_priority_yields_when_it_has_fuel(topology):
     """Not a hardcoded 'B moves': give sat_A fuel and the lower-priority party yields."""
-    scenario = generate_scenario()
+    scenario = generate_scenario().model_copy(deep=True)
     for o in scenario.objects:
         if o.id == "sat_A":
             o.fuel_budget_dv = 0.05  # now A *can* maneuver
@@ -113,6 +118,32 @@ def test_propose_carries_recipient_id_of_partner(topology):
         assert rid == "sat_A", (
             f"{topology}: propose.recipient_id should be the partner sat_A, got {rid}"
         )
+
+
+@pytest.mark.parametrize("topology", ["swarm", "hierarchical"])
+def test_equal_priority_still_resolves(topology):
+    """Equal priority must not deadlock: exactly one capable sat maneuvers."""
+    scenario = generate_scenario().model_copy(deep=True)
+    for o in scenario.objects:
+        if o.id in ("sat_A", "sat_B"):
+            o.priority = 5
+            o.fuel_budget_dv = 0.05  # both capable, equal standing
+    result = make_negotiator(topology).negotiate(_context(scenario, PRIMARY, topology))
+    assert result.converged, f"{topology} deadlocked on equal priority: {result.note}"
+    assert len(result.committed) == 1, "exactly one party should maneuver, not both"
+    assert result.committed[0].proposer_id in ("sat_A", "sat_B")
+
+
+@pytest.mark.parametrize("topology", ["swarm", "hierarchical"])
+def test_unknown_object_id_fails_soft(topology):
+    """A conjunction naming a missing object must not KeyError into WS3's loop."""
+    scenario = generate_scenario()
+    bad = Conjunction(
+        a_id="sat_A", b_id="ghost_999", tca=900.0, miss_distance_km=1.8, rel_speed=10.7
+    )
+    result = make_negotiator(topology).negotiate(_context(scenario, bad, topology))
+    assert not result.converged
+    assert result.committed == []
 
 
 def test_full_arc_resolves_and_catches_secondary():
