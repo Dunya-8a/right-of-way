@@ -48,13 +48,20 @@ interface GroupConfig {
   id:       string;
   label:    string;
   color:    number;
-  labeled:  boolean;   // render individual meshes + CSS2D names (small groups only)
-  dotSize:  number;    // PointsMaterial size in scene units
+  labeled:  boolean;        // render individual meshes + CSS2D names (small groups only)
+  dotSize:  number;         // PointsMaterial size in scene units
   maxCount: number;
+  // Only label sats whose name matches this predicate (labeled groups only)
+  shouldLabel?: (name: string) => boolean;
 }
 
+// Primary stations: ISS complex + CSS Tiangong — these get name labels.
+// Everything else in the stations group gets a dot only (no label)
+// to avoid the cluster of CubeSats/berthed vehicles all stacking at the same screen point.
+const isMainStation = (name: string) => /^(ISS \(|CSS \(|TIANGONG|MIR|ZARYA)/i.test(name);
+
 const GROUPS: GroupConfig[] = [
-  { id: 'stations', label: 'STATIONS', color: 0xffffff, labeled: true,  dotSize: 0.022, maxCount: 30  },
+  { id: 'stations', label: 'STATIONS', color: 0xffffff, labeled: true,  dotSize: 0.022, maxCount: 30, shouldLabel: isMainStation },
   { id: 'starlink', label: 'STARLINK', color: 0x5599ff, labeled: false, dotSize: 0.030, maxCount: 500 },
   { id: 'active',   label: 'ALL ACTIVE', color: 0x7799aa, labeled: false, dotSize: 0.022, maxCount: 800 },
 ];
@@ -74,8 +81,8 @@ interface GroupState {
   // Dense groups: single Points object, fast buffer update
   points:   THREE.Points | null;
   posAttr:  THREE.BufferAttribute | null;
-  // Labeled groups: individual sphere meshes with CSS2D names
-  meshes:   Array<{ mesh: THREE.Mesh; label: CSS2DObject }>;
+  // Labeled groups: individual sphere meshes; label is null for dot-only entries
+  meshes:   Array<{ mesh: THREE.Mesh; label: CSS2DObject | null }>;
   visible:  boolean;
   loaded:   boolean;
   updating: boolean;
@@ -121,20 +128,27 @@ export class LiveSatLayer {
     const meshes: GroupState['meshes'] = [];
 
     if (cfg.labeled) {
-      // Small group: individual sphere + CSS2D label per satellite
+      // Small group: individual sphere mesh per satellite.
+      // Only sats matching shouldLabel() get a CSS2D name label —
+      // the rest still get a dot but no text (avoids cluster overlap).
       const meshMat  = new THREE.MeshBasicMaterial({ color: cfg.color });
       const meshGeom = new THREE.SphereGeometry(0.013, 10, 6);
       for (const sat of sats) {
         const mesh = new THREE.Mesh(meshGeom, meshMat);
         mesh.visible = false;
-        const div = document.createElement('div');
-        div.className = 'live-label';
-        div.textContent = sat.name;
-        const label = new CSS2DObject(div);
-        label.position.set(0, 0.028, 0);
-        mesh.add(label);
+        if (!cfg.shouldLabel || cfg.shouldLabel(sat.name)) {
+          const div = document.createElement('div');
+          div.className = 'live-label';
+          div.textContent = sat.name;
+          const label = new CSS2DObject(div);
+          label.position.set(0, 0.028, 0);
+          mesh.add(label);
+          meshes.push({ mesh, label });
+        } else {
+          // Unlabeled dot — still tracked so position updates correctly
+          meshes.push({ mesh, label: null });
+        }
         this.scene.add(mesh);
-        meshes.push({ mesh, label });
       }
     } else {
       // Dense group: single Points object with glow sprite
