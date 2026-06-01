@@ -228,7 +228,7 @@
       white-space: nowrap; pointer-events: none;
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-DfKaDgd4.js"></script>
+  <script type="module" crossorigin src="/assets/index-BYisx6p8.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -248,10 +248,12 @@
   </div>
 
   <div id="live-sats-panel">
-    <div id="live-sats-header">LIVE TRACKED OBJECTS</div>
-    <button class="sat-group-btn" data-group="stations"   style="--group-color:#ffffff">STATIONS   <span class="btn-count"></span></button>
-    <button class="sat-group-btn" data-group="starlink"   style="--group-color:#4488ff">STARLINK   <span class="btn-count"></span></button>
-    <button class="sat-group-btn" data-group="active"     style="--group-color:#888888">ALL ACTIVE <span class="btn-count"></span></button>
+    <div id="live-sats-header">SCENE LAYERS</div>
+    <button class="sat-group-btn active" id="sim-toggle" style="--group-color:#00d4ff">SIMULATION <span class="btn-count"></span></button>
+    <div style="height:1px;background:rgba(0,212,255,0.15);margin:2px 0"></div>
+    <button class="sat-group-btn" data-group="stations" style="--group-color:#ffffff">STATIONS   <span class="btn-count"></span></button>
+    <button class="sat-group-btn" data-group="starlink" style="--group-color:#5599ff">STARLINK   <span class="btn-count"></span></button>
+    <button class="sat-group-btn" data-group="active"   style="--group-color:#7799aa">ALL ACTIVE <span class="btn-count"></span></button>
   </div>
 
   <div id="log-panel">

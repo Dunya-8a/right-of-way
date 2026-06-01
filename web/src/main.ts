@@ -714,6 +714,14 @@ function loadTimeline(data: Timeline) {
 
   subtitleEl.textContent = (data.meta['scenario'] as string | undefined) ?? 'Unnamed scenario';
   log(tMin, `Loaded — ${ids.length} objects, ${data.events.length} events`, 'info');
+
+  // Update sim toggle count badge
+  const simBtn = document.getElementById('sim-toggle');
+  if (simBtn) {
+    const countEl = simBtn.querySelector<HTMLElement>('.btn-count');
+    if (countEl) countEl.textContent = `(${ids.length})`;
+    simBtn.classList.toggle('active', simVisible);
+  }
 }
 
 // ── Animation loop ────────────────────────────────────────────────────────────
@@ -849,6 +857,42 @@ window.addEventListener('drop', e => {
     catch { alert('Invalid Timeline JSON — check the console.'); }
   };
   reader.readAsText(file);
+});
+
+// ── Simulation visibility toggle ──────────────────────────────────────────────
+let simVisible = true;
+
+function setSimVisible(v: boolean) {
+  simVisible = v;
+  sats.forEach(sat => {
+    sat.mesh.visible = v;
+    sat.trailLine.visible = v;
+    if (sat.orbitRing) sat.orbitRing.visible = v;
+  });
+  // conjunction / proposal overlays track sim sats — hide them too
+  if (!v) {
+    conjLines.forEach(l => { l.visible = false; });
+    conjMidPts.forEach(m => { m.visible = false; });
+    manArrows.forEach(a => { a.visible = false; });
+    if (propLine) propLine.visible = false;
+    if (propPacket) propPacket.visible = false;
+    resolvedLabels.forEach((obj, id) => { sats.get(id)?.mesh && (sats.get(id)!.mesh.visible = false); });
+  } else {
+    conjLines.forEach(l => { l.visible = true; });
+    conjMidPts.forEach(m => { m.visible = true; });
+    manArrows.forEach(a => { a.visible = true; });
+    if (propLine) propLine.visible = true;
+    if (propPacket) propPacket.visible = true;
+  }
+}
+
+document.getElementById('sim-toggle')?.addEventListener('click', function(this: HTMLElement) {
+  simVisible = !simVisible;
+  setSimVisible(simVisible);
+  this.classList.toggle('active', simVisible);
+  const count = sats.size;
+  const countEl = this.querySelector<HTMLElement>('.btn-count');
+  if (countEl) countEl.textContent = `(${count})`;
 });
 
 // ── Live satellite layer ──────────────────────────────────────────────────────
