@@ -3,11 +3,13 @@
 
 > **We gave satellites a group chat to keep them from crashing into each other.**
 
-![Two satellites negotiating a collision-avoidance maneuver in plain English over A2A, with the physics engine refereeing](docs/images/negotiation-chat.png)
+![Right of Way live: two satellites on a collision course — 1.5 km and 3.0 km separation, sat_B's maneuver vector firing, the physics referee flagging two active conjunctions, over a real NASA Earth](docs/images/hero-conjunction.png)
 
 When two satellites from different operators drift onto a collision course, there's no mission control to settle it — each one only knows its own fuel, its own mission, and wants the *other* one to move. **Right of Way turns them into AI agents that negotiate their own avoidance maneuvers — peer-to-peer, no central planner** — while a **deterministic physics engine referees every deal** and catches the moment one satellite's dodge creates the *next* near-miss. *Kessler syndrome, handled by conversation.*
 
-![The live 3D view — two active conjunctions, the agents' burn proposals streaming into the event log, maneuver vectors on the satellites, over a real NASA Earth](docs/images/negotiation.png)
+And here's what makes it *agentic* — the satellites talk it out, in plain English, over A2A while the physics engine referees:
+
+![Two satellites negotiating a collision-avoidance maneuver in plain English over A2A, with the physics engine refereeing](docs/images/negotiation-chat.png)
 
 > *Built at the **Multi-Agent Orchestration Build Day** · The Engine, Cambridge MA · May 31, 2026.*
 
@@ -43,6 +45,8 @@ topology=hierarchical  converged=True  iterations=2  total_dv=20.0 m/s  rounds=2
   t=  335.8  maneuver_committed     sat_C  Δv 0.010 km/s
   t=  879.6  resolved                                               ← provably clear
 ```
+
+![The live 3D view — the forced-trade constellation over a real NASA Earth (Blue Marble + live GIBS tiles); green when the orbit is provably clear](docs/images/all-clear.png)
 
 ## How it works
 
