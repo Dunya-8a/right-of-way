@@ -48,24 +48,13 @@ interface GroupConfig {
   id:       string;
   label:    string;
   color:    number;
-  labeled:  boolean;        // render individual meshes + CSS2D names (small groups only)
-  dotSize:  number;         // PointsMaterial size in scene units
+  labeled:  boolean;   // render individual meshes + CSS2D names (small groups only)
+  dotSize:  number;    // PointsMaterial size in scene units
   maxCount: number;
-  // Only label sats whose name matches this predicate (labeled groups only)
-  shouldLabel?: (name: string) => boolean;
 }
 
-// Only the primary hub module of each station gets a name label.
-// Sub-modules (Wentian, Mengtian, Nauka, Poisk) and berthed vehicles
-// share the same orbit and would stack on top if labeled.
-const STATION_LABEL_WHITELIST = new Set([
-  'ISS (ZARYA)',
-  'CSS (TIANHE)',
-]);
-const isMainStation = (name: string) => STATION_LABEL_WHITELIST.has(name.trim());
-
 const GROUPS: GroupConfig[] = [
-  { id: 'stations', label: 'STATIONS', color: 0xffffff, labeled: true,  dotSize: 0.022, maxCount: 30, shouldLabel: isMainStation },
+  { id: 'stations', label: 'STATIONS', color: 0xffffff, labeled: true,  dotSize: 0.022, maxCount: 30 },
   { id: 'starlink', label: 'STARLINK', color: 0x5599ff, labeled: false, dotSize: 0.030, maxCount: 500 },
   { id: 'active',   label: 'ALL ACTIVE', color: 0x7799aa, labeled: false, dotSize: 0.022, maxCount: 800 },
 ];
@@ -95,9 +84,10 @@ interface GroupState {
 const SPRITE = makeGlowSprite();
 
 export class LiveSatLayer {
-  private scene:  THREE.Scene;
-  private groups: Map<string, GroupState> = new Map();
+  private scene:     THREE.Scene;
+  private groups:    Map<string, GroupState> = new Map();
   private tick = 0;
+  private pickLabel: CSS2DObject | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -140,18 +130,13 @@ export class LiveSatLayer {
       for (const sat of sats) {
         const mesh = new THREE.Mesh(meshGeom, meshMat);
         mesh.visible = false;
-        if (!cfg.shouldLabel || cfg.shouldLabel(sat.name)) {
-          const div = document.createElement('div');
-          div.className = 'live-label';
-          div.textContent = sat.name;
-          const label = new CSS2DObject(div);
-          label.position.set(0, 0.028, 0);
-          mesh.add(label);
-          meshes.push({ mesh, label });
-        } else {
-          // Unlabeled dot — still tracked so position updates correctly
-          meshes.push({ mesh, label: null });
-        }
+        const div = document.createElement('div');
+        div.className = 'live-label';
+        div.textContent = sat.name;
+        const label = new CSS2DObject(div);
+        label.position.set(0, 0.028, 0);
+        mesh.add(label);
+        meshes.push({ mesh, label });
         this.scene.add(mesh);
       }
     } else {
@@ -182,7 +167,38 @@ export class LiveSatLayer {
     };
     this.groups.set(groupId, state);
     this.propagateGroup(state, new Date());
+    if (cfg.labeled) this.stackClusteredLabels(state);
     return sats.length;
+  }
+
+  // Satellites physically close together (attached modules, docked vehicles)
+  // would all project to the same screen point. Sort each cluster by name and
+  // assign monotonically increasing Y offsets so labels form a readable stack.
+  private stackClusteredLabels(state: GroupState) {
+    const { sats, meshes } = state;
+    const THRESHOLD = 0.08;  // ~550 km — catches attached modules reliably
+    const STEP = 0.032;      // vertical gap between stacked labels (scene units)
+    const used = new Set<number>();
+
+    for (let i = 0; i < sats.length; i++) {
+      if (used.has(i)) continue;
+      const cluster: number[] = [i];
+      used.add(i);
+      for (let j = i + 1; j < sats.length; j++) {
+        if (!used.has(j) && sats[i].pos.distanceTo(sats[j].pos) < THRESHOLD) {
+          cluster.push(j);
+          used.add(j);
+        }
+      }
+      // Sort alphabetically so the stack order is stable/readable
+      cluster.sort((a, b) => sats[a].name.localeCompare(sats[b].name));
+      cluster.forEach((idx, rank) => {
+        const entry = meshes[idx];
+        if (entry?.label) {
+          entry.label.position.set(0, 0.028 + rank * STEP, 0);
+        }
+      });
+    }
   }
 
   private propagateGroup(state: GroupState, date: Date) {
@@ -225,6 +241,35 @@ export class LiveSatLayer {
     if (state.points) state.points.visible = visible;
     for (const { mesh } of state.meshes) mesh.visible = visible;
     if (visible) this.propagateGroup(state, new Date());
+  }
+
+  // Raycast-pick a point from any non-labeled group and show a floating name label.
+  // cameraDistance is used to scale the picking threshold with zoom level.
+  handleClick(raycaster: THREE.Raycaster, cameraDistance: number): boolean {
+    this.clearPickLabel();
+    let hit = false;
+    this.groups.forEach(state => {
+      if (hit || !state.visible || !state.points || state.cfg.labeled) return;
+      raycaster.params.Points = { threshold: cameraDistance * 0.012 };
+      const hits = raycaster.intersectObject(state.points);
+      if (!hits.length || hits[0].index == null) return;
+      const sat = state.sats[hits[0].index];
+      if (!sat) return;
+
+      const div = document.createElement('div');
+      div.className = 'live-label-picked';
+      div.textContent = sat.name;
+      const label = new CSS2DObject(div);
+      label.position.copy(sat.pos).addScaledVector(sat.pos.clone().normalize(), 0.04);
+      this.scene.add(label);
+      this.pickLabel = label;
+      hit = true;
+    });
+    return hit;
+  }
+
+  clearPickLabel() {
+    if (this.pickLabel) { this.scene.remove(this.pickLabel); this.pickLabel = null; }
   }
 
   isVisible(groupId: string): boolean { return this.groups.get(groupId)?.visible ?? false; }

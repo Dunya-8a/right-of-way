@@ -19,10 +19,10 @@
       "debris_1"
     ],
     "generated_by": "row.orchestrator.run",
-    "topology": "hierarchical",
+    "topology": "swarm",
     "converged": true,
     "total_dv_km_s": 0.02,
-    "rounds_total": 4,
+    "rounds_total": 10,
     "iterations": 2,
     "scenario": "forced-trade demo"
   },
@@ -4117,7 +4117,7 @@
       "type": "proposal",
       "data": {
         "fallback": true,
-        "note": "hierarchical negotiation did not converge ([hierarchical] movers=['sat_B'] total_dv=0.0281 km/s; physics: burn does not clear within fuel \u2014 flagged for WS3 fallback); deterministic verified fallback engaged"
+        "note": "swarm negotiation did not converge ([swarm] movers=['sat_B'] total_dv=0.0281 km/s; physics: burn does not clear within fuel \u2014 flagged for WS3 fallback); deterministic verified fallback engaged"
       }
     },
     {
@@ -4133,12 +4133,75 @@
           ],
           "t_burn": 420.0001262530616,
           "est_dv_cost": 0.009375,
-          "rationale": "sat_A is lower priority and would normally give way, but its \u0394v budget is ~0 \u2014 it cannot maneuver. Assigning sat_B (priority 9) to trade and maneuver instead."
+          "rationale": "Although sat_A holds higher priority (priority 1 vs. my priority 9), it has declared zero fuel and physically cannot maneuver, so I must take the burn \u2014 I have 0.0600 km/s of remaining \u0394v and will execute the collision-avoidance maneuver to resolve this conjunction."
         },
         "recipient_id": "sat_A",
-        "rationale": "sat_A is lower priority and would normally give way, but its \u0394v budget is ~0 \u2014 it cannot maneuver. Assigning sat_B (priority 9) to trade and maneuver instead.",
+        "rationale": "Although sat_A holds higher priority (priority 1 vs. my priority 9), it has declared zero fuel and physically cannot maneuver, so I must take the burn \u2014 I have 0.0600 km/s of remaining \u0394v and will execute the collision-avoidance maneuver to resolve this conjunction.",
         "from_id": "sat_B",
-        "to_id": "coordinator"
+        "to_id": "sat_A"
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "proposal",
+      "data": {
+        "proposal": {
+          "proposer_id": "sat_B",
+          "dv_vector": [
+            6.573843285669936e-06,
+            0.006629518851537295,
+            -0.006628730012732158
+          ],
+          "t_burn": 420.0001262530616,
+          "est_dv_cost": 0.009375,
+          "rationale": "Since sat_A has declared it cannot maneuver due to zero fuel, I must take the burn regardless of priority rankings \u2014 I have sufficient remaining \u0394v (0.06 km/s) to execute the avoidance maneuver safely before TCA in 600 s."
+        },
+        "recipient_id": "sat_A",
+        "rationale": "Since sat_A has declared it cannot maneuver due to zero fuel, I must take the burn regardless of priority rankings \u2014 I have sufficient remaining \u0394v (0.06 km/s) to execute the avoidance maneuver safely before TCA in 600 s.",
+        "from_id": "sat_B",
+        "to_id": "sat_A"
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "proposal",
+      "data": {
+        "proposal": {
+          "proposer_id": "sat_B",
+          "dv_vector": [
+            6.573843285669936e-06,
+            0.006629518851537295,
+            -0.006628730012732158
+          ],
+          "t_burn": 420.0001262530616,
+          "est_dv_cost": 0.009375,
+          "rationale": "Since sat_A has declared it cannot maneuver due to zero fuel, I must take the burn regardless of priority rankings \u2014 I have 0.0600 km/s of \u0394v available and will execute the avoidance maneuver to resolve this conjunction."
+        },
+        "recipient_id": "sat_A",
+        "rationale": "Since sat_A has declared it cannot maneuver due to zero fuel, I must take the burn regardless of priority rankings \u2014 I have 0.0600 km/s of \u0394v available and will execute the avoidance maneuver to resolve this conjunction.",
+        "from_id": "sat_B",
+        "to_id": "sat_A"
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "proposal",
+      "data": {
+        "proposal": {
+          "proposer_id": "sat_B",
+          "dv_vector": [
+            6.573843285669936e-06,
+            0.006629518851537295,
+            -0.006628730012732158
+          ],
+          "t_burn": 420.0001262530616,
+          "est_dv_cost": 0.009375,
+          "rationale": "Since sat_A (priority 1, higher rank) has declared it cannot maneuver due to zero fuel, I must take the burn despite being the lower-priority satellite \u2014 I have sufficient remaining \u0394v (0.06 km/s) to execute the avoidance maneuver safely before TCA in 600 s."
+        },
+        "recipient_id": "sat_A",
+        "rationale": "Since sat_A (priority 1, higher rank) has declared it cannot maneuver due to zero fuel, I must take the burn despite being the lower-priority satellite \u2014 I have sufficient remaining \u0394v (0.06 km/s) to execute the avoidance maneuver safely before TCA in 600 s.",
+        "from_id": "sat_B",
+        "to_id": "sat_A"
       }
     },
     {
@@ -4193,7 +4256,28 @@
       "type": "proposal",
       "data": {
         "fallback": true,
-        "note": "hierarchical negotiation did not converge ([hierarchical] movers=['sat_C'] total_dv=0.0392 km/s; physics: burn does not clear within fuel \u2014 flagged for WS3 fallback); deterministic verified fallback engaged"
+        "note": "swarm negotiation did not converge ([swarm] movers=['sat_C', 'sat_B'] total_dv=0.0785 km/s; physics: burn does not clear within fuel \u2014 flagged for WS3 fallback); deterministic verified fallback engaged"
+      }
+    },
+    {
+      "t": 240.00005050122465,
+      "type": "proposal",
+      "data": {
+        "proposal": {
+          "proposer_id": "sat_B",
+          "dv_vector": [
+            -0.013079659147716005,
+            0.0,
+            -5.830118898874044e-05
+          ],
+          "t_burn": 659.6131976660176,
+          "est_dv_cost": 0.013079789082743976,
+          "rationale": "I am sat_B with priority 9, which is lower priority than sat_C's priority 5, so per right-of-way norms I am the expected give-way party, and with 0.05 km/s of remaining \u0394v I can maneuver to resolve the conjunction."
+        },
+        "recipient_id": "sat_C",
+        "rationale": "I am sat_B with priority 9, which is lower priority than sat_C's priority 5, so per right-of-way norms I am the expected give-way party, and with 0.05 km/s of remaining \u0394v I can maneuver to resolve the conjunction.",
+        "from_id": "sat_B",
+        "to_id": "sat_C"
       }
     },
     {
@@ -4209,12 +4293,12 @@
           ],
           "t_burn": 659.6131976660176,
           "est_dv_cost": 0.013079789082743976,
-          "rationale": "sat_C is the lowest-priority satellite that can maneuver; assigning it to give way."
+          "rationale": "I am sat_C with lower priority (5) than sat_B (priority 9), I have sufficient remaining \u0394v (0.0450 km/s) to maneuver, so I will give way as the right-of-way norm requires."
         },
         "recipient_id": "sat_B",
-        "rationale": "sat_C is the lowest-priority satellite that can maneuver; assigning it to give way.",
+        "rationale": "I am sat_C with lower priority (5) than sat_B (priority 9), I have sufficient remaining \u0394v (0.0450 km/s) to maneuver, so I will give way as the right-of-way norm requires.",
         "from_id": "sat_C",
-        "to_id": "coordinator"
+        "to_id": "sat_B"
       }
     },
     {
@@ -4257,7 +4341,7 @@
         "all_clear": true,
         "iterations": 2,
         "total_dv_km_s": 0.02,
-        "rounds": 4,
+        "rounds": 10,
         "note": "No conjunctions remain over the screen window."
       }
     }

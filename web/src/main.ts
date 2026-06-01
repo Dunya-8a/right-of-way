@@ -838,6 +838,31 @@ document.getElementById('live-btn')?.addEventListener('click', () => {
   fetchLiveEarth(earthMat).catch(console.warn);
 });
 
+// ── Live satellite click-to-label ─────────────────────────────────────────────
+{
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  let mouseDownX = 0, mouseDownY = 0;
+
+  renderer.domElement.addEventListener('mousedown', e => {
+    mouseDownX = e.clientX; mouseDownY = e.clientY;
+  });
+
+  renderer.domElement.addEventListener('click', e => {
+    // Ignore drag operations (OrbitControls pan/rotate)
+    if (Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY) > 5) return;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.set(
+      ((e.clientX - rect.left) / rect.width)  *  2 - 1,
+      ((e.clientY - rect.top)  / rect.height) * -2 + 1,
+    );
+    raycaster.setFromCamera(mouse, camera);
+    const hit = liveLayer.handleClick(raycaster, camera.position.length());
+    if (!hit) liveLayer.clearPickLabel();
+  });
+}
+
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
