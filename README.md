@@ -66,6 +66,11 @@ uv run python -m row.agents.demo
 # the full verify-and-repair run — emits web/public/timeline.json (the run shown above)
 uv run python -m row.orchestrator            # add --topology swarm to switch topologies
 
+# the same run under W&B Weave — every negotiate() + physics call traced
+uv run python -m row.eval --topology swarm            # add --mock for the offline brain
+uv run python -m row.eval --leaderboard               # swarm/hierarchical × mock/claude scored
+uv run python -m row.eval --guardrail                 # the over-budget referee guardrail
+
 # the physics core as a real MCP server (stdio transport)
 uv run python -m row.physics.mcp_server
 
@@ -101,7 +106,7 @@ web/                        # three.js + Vite 3D orbit viz (real NASA Blue Marbl
 
 ## Sponsor tools
 
-- **W&B Weave** — traces the full multi-agent run (every `negotiate()`, every MCP physics call, every repair iteration) so an opaque agent loop becomes a transcript you can read and evaluate.
+- **W&B Weave** — traces the full multi-agent run (every `negotiate()`, every physics `screen_conjunctions` / `apply_maneuver`, every repair iteration) so an opaque agent loop becomes a transcript you can read and evaluate. The verifier-first principle becomes *visible*: each candidate burn an agent proposes is a physics call nested under its negotiation, and an over-budget burn surfaces as a referee `ValueError` right in the trace. A Weave **evaluation + leaderboard** scores `swarm` vs `hierarchical` × `MockBrain` vs `ClaudeBrain` on six metrics (conjunctions resolved, new conjunctions created, total Δv, rounds-to-converge, iterations, and a budget guardrail). Instrumentation is **additive** — a thin `row/eval/` wrapper around the seams the loop already exposes, touching neither the contracts nor the run loop. See [`row/eval/`](row/eval/) (`uv run python -m row.eval --leaderboard`).
 - **Anthropic Claude (Sonnet 4.6)** — the reasoning core of each satellite-agent (tool-use + prompt caching, with a deterministic offline fallback so the demo never breaks). Claude Code was also the *build* harness: parallel agent sessions, one per workstream, each in its own worktree.
 - **MCP** — the physics referee as a real FastMCP tool server, the thing that keeps the LLM-agents honest.
 

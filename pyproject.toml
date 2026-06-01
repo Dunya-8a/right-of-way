@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7",
     "numpy>=1.26",  # WS1 physics core — now the orchestrator's default referee
+    "weave>=0.52.41",
 ]
 
 [project.optional-dependencies]
