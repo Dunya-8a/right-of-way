@@ -1,18 +1,48 @@
 # Right of Way
+### Agentic air-traffic control for space 🛰️
 
-**There's no air-traffic control in space.** When two satellites from different operators drift onto a collision course, nobody is in charge — each one only knows its own fuel, its own mission, and wants the *other* one to move. **Right of Way turns the satellites into AI agents that negotiate their own collision avoidance — peer-to-peer, no central planner — refereed by a deterministic physics engine that won't let them lie.**
+> **We gave satellites a group chat to keep them from crashing into each other.**
 
-![Right of Way — live negotiation: two active conjunctions, the agents' burn proposals streaming into the event log, and maneuver vectors on the satellites](docs/images/negotiation.png)
+![Two satellites negotiating a collision-avoidance maneuver in plain English over A2A, with the physics engine refereeing](docs/images/negotiation-chat.png)
+
+When two satellites from different operators drift onto a collision course, there's no mission control to settle it — each one only knows its own fuel, its own mission, and wants the *other* one to move. **Right of Way turns them into AI agents that negotiate their own avoidance maneuvers — peer-to-peer, no central planner** — while a **deterministic physics engine referees every deal** and catches the moment one satellite's dodge creates the *next* near-miss. *Kessler syndrome, handled by conversation.*
+
+![The live 3D view — two active conjunctions, the agents' burn proposals streaming into the event log, maneuver vectors on the satellites, over a real NASA Earth](docs/images/negotiation.png)
 
 > *Built at the **Multi-Agent Orchestration Build Day** · The Engine, Cambridge MA · May 31, 2026.*
 
 ---
 
-## The problem
+## Why this isn't just a physics sim
 
-Computing a *single* satellite's avoidance burn is solved, deterministic math — you should never want an LLM doing orbital mechanics. The hard part is the **coupling between operators who share no central authority, no shared objective function, and won't take each other's math on faith.** One satellite's dodge can shove it into a *third* satellite's path. That isn't a computation — it's a **negotiation under partial information with conflicting objectives.** Which is exactly what multi-agent systems are for.
+Computing *one* satellite's avoidance burn is solved, deterministic math — you should never want an LLM doing orbital mechanics. The hard part is the **coupling between operators who share no central authority, no common objective, and won't take each other's math on faith.** One satellite's dodge can shove it into a *third* satellite's path. That isn't a computation — it's a **negotiation under partial information with conflicting goals.** Which is exactly what multi-agent systems are for.
 
-The same mechanism generalizes to any fleet with no central boss: drones (the FAA's decentralized UTM / Part 108 framework lands ~2026), self-driving cars, autonomous ships.
+And the mechanism generalizes to any fleet with no central boss: drones (the FAA's decentralized UTM / Part 108 framework lands ~2026), self-driving cars, autonomous ships.
+
+## The demo that proves the agents are load-bearing
+
+The naive rule is *"lowest-priority satellite yields."* So we broke it: the lowest-priority satellite (`sat_A`) is **out of fuel and physically cannot move**, forcing the higher-priority `sat_B` to give up right-of-way and dodge anyway. **Nobody hard-codes this.** Listen in on the actual A2A exchange:
+
+```
+sat_A → sat_B   Right-of-way says I should give way to you — but my Δv budget is ~0.
+                I physically cannot maneuver. Requesting a trade.
+sat_B → sat_A   I hold right-of-way (priority 9 vs your 1). Requesting you give way.
+sat_B → sat_A   Understood — you have no fuel and can't move. Right-of-way is moot
+                against a sat that physically can't yield. I'll trade and take the burn.
+sat_B → sat_A   PROPOSE burn (0, +8.5, −8.5) m/s @ t+240s
+sat_A → sat_B   Your burn clears our conjunction. Accepted.
+```
+
+The trade **emerges from the conversation** — a test proves that giving `sat_A` fuel flips who moves, so it's negotiation, not an `if`-statement. Then `sat_B`'s dodge nearly clips a *third* satellite, the physics referee catches it, and they renegotiate. Here's a full run (`python -m row.orchestrator`):
+
+```
+topology=hierarchical  converged=True  iterations=2  total_dv=20.0 m/s  rounds=2
+  t=    0.0  conjunction_detected   sat_A / sat_B   (miss 3.0 km)
+  t=  240.0  maneuver_committed     sat_B  Δv 0.010 km/s
+  t=  240.0  new_conjunction        sat_B / sat_C   (miss 1.5 km)   ← the fix created a new risk
+  t=  335.8  maneuver_committed     sat_C  Δv 0.010 km/s
+  t=  879.6  resolved                                               ← provably clear
+```
 
 ## How it works
 
@@ -32,50 +62,22 @@ The same mechanism generalizes to any fleet with no central boss: drones (the FA
 - **Two topologies, one flag** — runs as an emergent peer-to-peer **swarm** *or* a **hierarchical** coordinator. Swarm stalls → fall back to hierarchical → flagged safe no-op. The demo can't hard-fail.
 - **Verifier-first** — LLM-agents reason about *intent, priority, and strategy*; the deterministic core owns *feasibility* (exact two-body propagation via universal variables, conjunction screening, fuel accounting). Knowing what to delegate to the model vs. to deterministic compute **is** the design.
 
-## The demo that proves the agents are load-bearing
-
-The naive rule is *"lowest-priority satellite yields."* So we broke it: the lowest-priority satellite (`sat_A`) is **out of fuel and physically cannot move**, forcing the higher-priority `sat_B` to give up right-of-way and dodge anyway. Nobody hard-codes this — `sat_A` says "I can't move," `sat_B` hears it and concedes. The trade **emerges from the conversation.** (A test proves that giving `sat_A` fuel flips who moves — so it's negotiation, not an `if`-statement.)
-
-Then `sat_B`'s dodge nearly clips a *third* satellite, the re-screen catches it, and they renegotiate. Here's a real run (`python -m row.orchestrator`):
-
-```
-topology=hierarchical  converged=True  iterations=2  total_dv=20.0 m/s  rounds=2
-events (7):
-  t=    0.0  conjunction_detected   sat_A / sat_B   (miss 3.0 km)
-  t=    0.0  proposal
-  t=  240.0  maneuver_committed     sat_B  Δv 0.010 km/s
-  t=  240.0  new_conjunction        sat_B / sat_C   (miss 1.5 km)   ← the fix created a new risk
-  t=  240.0  proposal
-  t=  335.8  maneuver_committed     sat_C  Δv 0.010 km/s
-  t=  879.6  resolved                                               ← provably clear
-```
-
-![Right of Way — overview: the forced-trade constellation over a live NASA Earth, all clear before the first conjunction](docs/images/overview.png)
-
 ## Run it
 
 ```bash
 uv sync
 
-# the deterministic referee — propagation, conjunction screening, the avoidance burn
-uv run python -m row.physics.demo
-
-# the agents negotiating directly — both topologies + the forced-trade transcript
-uv run python -m row.agents.demo
-
-# the full verify-and-repair run — emits web/public/timeline.json (the run shown above)
-uv run python -m row.orchestrator            # add --topology swarm to switch topologies
+uv run python -m row.agents.demo         # the agents negotiating — both topologies + the forced-trade transcript
+uv run python -m row.orchestrator        # the full verify-and-repair run → emits web/public/timeline.json
+uv run python -m row.physics.demo        # the deterministic referee: propagation, screening, the avoidance burn
+uv run python -m row.physics.mcp_server  # the physics core as a real MCP server (stdio transport)
 
 # the same run under W&B Weave — every negotiate() + physics call traced
-uv run python -m row.eval --topology swarm            # add --mock for the offline brain
-uv run python -m row.eval --leaderboard               # swarm/hierarchical × mock/claude scored
-uv run python -m row.eval --guardrail                 # the over-budget referee guardrail
+uv run python -m row.eval --topology swarm   # add --mock for the offline brain
+uv run python -m row.eval --leaderboard      # swarm/hierarchical × mock/claude scored
+uv run python -m row.eval --guardrail        # the over-budget referee guardrail
 
-# the physics core as a real MCP server (stdio transport)
-uv run python -m row.physics.mcp_server
-
-# the 3D visualization — plays back the emitted Timeline
-cd web && pnpm install && pnpm dev
+cd web && pnpm install && pnpm dev       # the 3D visualization — plays back the emitted Timeline
 ```
 
 ## Architecture
@@ -98,11 +100,7 @@ row/
 web/                        # three.js + Vite 3D orbit viz (real NASA Blue Marble / live GIBS tiles)
 ```
 
-> **Built in parallel.** The four workstreams — physics core, MCP server, the Claude-backed
-> A2A agent layer, and the verify-and-repair orchestrator — were developed concurrently in
-> separate git worktrees against locked `pydantic` contracts, then merged to `main`. The
-> orchestrator runs the real peer-to-peer agents by default and falls back to deterministic
-> reference negotiators if the agent layer is unavailable, so the pipeline always runs.
+> **Built in parallel.** The four workstreams — physics core, MCP server, the Claude-backed A2A agent layer, and the verify-and-repair orchestrator — were developed concurrently in separate git worktrees against locked `pydantic` contracts, then merged to `main`. A multi-agent build process for a multi-agent product. The orchestrator runs the real peer-to-peer agents by default and falls back to deterministic reference negotiators if the agent layer is unavailable, so the pipeline always runs.
 
 ## Sponsor tools
 

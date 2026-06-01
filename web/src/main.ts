@@ -127,7 +127,11 @@ async function fetchLiveEarth(mat: THREE.MeshPhongMaterial): Promise<void> {
           .then(blob => new Promise<void>(resolve => {
             const img = new Image();
             img.onload = () => {
+              // Amplify cloud signal: pull sparse bright pixels (clouds) to white,
+              // collapse dark no-data pixels to black → Blue Marble wins via lighten
+              ctx.filter = 'brightness(3) contrast(2)';
               ctx.drawImage(img, col * GIBS_TILE, row * GIBS_TILE, GIBS_TILE, GIBS_TILE);
+              ctx.filter = 'none';
               partialTex.needsUpdate = true;
               resolve();
             };
