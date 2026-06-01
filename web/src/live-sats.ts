@@ -55,10 +55,14 @@ interface GroupConfig {
   shouldLabel?: (name: string) => boolean;
 }
 
-// Primary stations: ISS complex + CSS Tiangong — these get name labels.
-// Everything else in the stations group gets a dot only (no label)
-// to avoid the cluster of CubeSats/berthed vehicles all stacking at the same screen point.
-const isMainStation = (name: string) => /^(ISS \(|CSS \(|TIANGONG|MIR|ZARYA)/i.test(name);
+// Only the primary hub module of each station gets a name label.
+// Sub-modules (Wentian, Mengtian, Nauka, Poisk) and berthed vehicles
+// share the same orbit and would stack on top if labeled.
+const STATION_LABEL_WHITELIST = new Set([
+  'ISS (ZARYA)',
+  'CSS (TIANHE)',
+]);
+const isMainStation = (name: string) => STATION_LABEL_WHITELIST.has(name.trim());
 
 const GROUPS: GroupConfig[] = [
   { id: 'stations', label: 'STATIONS', color: 0xffffff, labeled: true,  dotSize: 0.022, maxCount: 30, shouldLabel: isMainStation },
