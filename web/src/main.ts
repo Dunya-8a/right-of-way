@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { LiveSatLayer } from './live-sats.js';
 
 // ── Timeline contract (mirrors web/types.ts) ─────────────────────────────────
 type Vec3 = [number, number, number];
@@ -774,6 +775,7 @@ function frame() {
   }
 
   earth.rotation.y += 0.00008;
+  liveLayer.tick60(new Date());
   controls.update();
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
@@ -847,6 +849,41 @@ window.addEventListener('drop', e => {
     catch { alert('Invalid Timeline JSON — check the console.'); }
   };
   reader.readAsText(file);
+});
+
+// ── Live satellite layer ──────────────────────────────────────────────────────
+const liveLayer = new LiveSatLayer(scene);
+
+function updateSatGroupBtn(btn: HTMLElement) {
+  const groupId = btn.dataset['group']!;
+  const active = liveLayer.isVisible(groupId);
+  const n = liveLayer.count(groupId);
+  btn.classList.toggle('active', active);
+  const countEl = btn.querySelector('.btn-count') as HTMLElement;
+  if (countEl) countEl.textContent = n > 0 ? `(${n})` : '';
+}
+
+document.querySelectorAll<HTMLElement>('.sat-group-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const groupId = btn.dataset['group']!;
+    if (!liveLayer.isLoaded(groupId)) {
+      btn.classList.add('loading');
+      btn.querySelector<HTMLElement>('.btn-count')!.textContent = '…';
+      try {
+        await liveLayer.loadGroup(groupId);
+        liveLayer.setVisible(groupId, true);
+      } catch (err) {
+        const msg = String(err).includes('rate-limit') ? '2h' : 'ERR';
+        console.warn('CelesTrak fetch failed:', err);
+        btn.querySelector<HTMLElement>('.btn-count')!.textContent = msg;
+      } finally {
+        btn.classList.remove('loading');
+      }
+    } else {
+      liveLayer.setVisible(groupId, !liveLayer.isVisible(groupId));
+    }
+    updateSatGroupBtn(btn);
+  });
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

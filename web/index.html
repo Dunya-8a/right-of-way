@@ -169,7 +169,43 @@
       flex-shrink: 0;
     }
 
+    /* ── Live satellite panel ────────────────────────────────────────────── */
+    #live-sats-panel {
+      position: absolute; top: 148px; left: 28px;
+      background: rgba(5,5,16,0.9);
+      border: 1px solid rgba(0,212,255,0.22);
+      border-radius: 4px;
+      padding: 8px 10px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    #live-sats-header {
+      font-size: 10px; letter-spacing: 0.2em;
+      color: rgba(0,212,255,0.5); margin-bottom: 2px;
+    }
+    .sat-group-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.45);
+      font-family: inherit; font-size: 11px; letter-spacing: 0.1em;
+      padding: 5px 10px; cursor: pointer; border-radius: 3px;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 14px; transition: all 0.15s; text-align: left;
+    }
+    .sat-group-btn .btn-count {
+      font-size: 10px; opacity: 0.6;
+    }
+    .sat-group-btn:hover { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.7); }
+    .sat-group-btn.active { border-color: currentColor; color: var(--group-color); }
+    .sat-group-btn.loading { opacity: 0.5; pointer-events: none; }
+
     /* ── CSS2D labels (projector-sized) ─────────────────────────────────── */
+    .live-label {
+      color: rgba(255,255,255,0.7);
+      font-family: 'Courier New', monospace;
+      font-size: 11px; letter-spacing: 0.06em;
+      text-shadow: 0 0 6px rgba(255,255,255,0.5);
+      white-space: nowrap; pointer-events: none;
+    }
     .sat-label {
       color: rgba(0,212,255,0.85);
       font-family: 'Courier New', monospace;
@@ -208,6 +244,13 @@
   <div id="phase-badge">
     <div id="phase-dot"></div>
     <div id="phase-text">ALL CLEAR</div>
+  </div>
+
+  <div id="live-sats-panel">
+    <div id="live-sats-header">LIVE TRACKED OBJECTS</div>
+    <button class="sat-group-btn" data-group="stations"   style="--group-color:#ffffff">STATIONS   <span class="btn-count"></span></button>
+    <button class="sat-group-btn" data-group="starlink"   style="--group-color:#4488ff">STARLINK   <span class="btn-count"></span></button>
+    <button class="sat-group-btn" data-group="active"     style="--group-color:#888888">ALL ACTIVE <span class="btn-count"></span></button>
   </div>
 
   <div id="log-panel">
