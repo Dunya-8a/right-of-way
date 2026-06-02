@@ -577,6 +577,7 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
         clearAllConj(); clearProposal(); clearAllArrows();
         showResolvedLabels();
         log(ev.t, `ALL CLEAR  —  total Δv ${(d['total_dv_km_s'] as number).toFixed(3)} km/s`, 'safe');
+        if (tl) setTimeout(() => showOutcomeCard(tl!), 1400);
         break;
       }
     }
@@ -705,6 +706,7 @@ function loadTimeline(data: Timeline) {
   initSats(ids, data.frames);
   clearAllConj(); clearProposal(); clearAllArrows(); clearResolvedLabels();
 
+  outcomeCard.classList.remove('visible');
   eventLog.innerHTML = '';
   scrubber.value = '0';
   updatePlayBtn();
@@ -788,6 +790,43 @@ function frame() {
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
 }
+
+// ── Outcome card ──────────────────────────────────────────────────────────────
+const outcomeCard = document.getElementById('outcome-card')!;
+
+function showOutcomeCard(timeline: Timeline) {
+  const m = timeline.meta as Record<string, unknown>;
+  const evts = timeline.events;
+
+  const converged = m['converged'] as boolean ?? true;
+  const dvMs  = ((m['total_dv_km_s'] as number ?? 0) * 1000).toFixed(1);
+  const rounds = String(m['rounds_total'] as number ?? 0);
+  const topology = String(m['topology'] as string ?? '').toUpperCase();
+  const scenario = String(m['scenario'] as string ?? '');
+  const conjCount = evts.filter(e => e.type === 'conjunction_detected' || e.type === 'new_conjunction').length;
+  const manCount  = evts.filter(e => e.type === 'maneuver_committed').length;
+  const resolvedEvt = evts.find(e => e.type === 'resolved');
+  const timeToClr = resolvedEvt ? String(Math.round(resolvedEvt.t)) : '—';
+
+  (document.getElementById('outcome-headline')!).textContent = converged ? 'RESOLVED' : 'UNRESOLVED';
+  (document.getElementById('outcome-scenario')!).textContent = scenario.toUpperCase();
+  (document.getElementById('stat-dv')!).textContent = dvMs;
+  (document.getElementById('stat-conjunctions')!).textContent = String(conjCount);
+  (document.getElementById('stat-maneuvers')!).textContent = String(manCount);
+  (document.getElementById('stat-rounds')!).textContent = rounds;
+  (document.getElementById('stat-time')!).textContent = timeToClr;
+  (document.getElementById('stat-topology')!).textContent = topology;
+
+  outcomeCard.classList.toggle('failed', !converged);
+  outcomeCard.classList.add('visible');
+}
+
+document.getElementById('outcome-dismiss')?.addEventListener('click', () => {
+  outcomeCard.classList.remove('visible');
+});
+outcomeCard.addEventListener('click', e => {
+  if (e.target === outcomeCard) outcomeCard.classList.remove('visible');
+});
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function updatePlayBtn() { playBtn.textContent = playing ? '⏸' : '▶'; }

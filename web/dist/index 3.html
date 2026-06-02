@@ -163,131 +163,13 @@
       transition: background 0.15s;
     }
     #live-btn:hover { background: rgba(0,255,136,0.12); }
-    #run-btn {
-      background: none;
-      border: 1px solid rgba(255,170,0,0.6);
-      color: #ffaa00; padding: 6px 14px;
-      font-family: inherit; font-size: 12px; letter-spacing: 0.1em;
-      cursor: pointer; border-radius: 4px; flex-shrink: 0;
-      transition: background 0.15s, opacity 0.15s;
-    }
-    #run-btn:hover:not(:disabled) { background: rgba(255,170,0,0.12); }
-    #run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     #earth-status {
       font-size: 10px; letter-spacing: 0.08em;
       color: rgba(0,255,136,0.6); min-width: 120px;
       flex-shrink: 0;
     }
 
-    /* ── Outcome card ────────────────────────────────────────────────────── */
-    #outcome-card {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(5,5,16,0.72);
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.5s ease;
-      z-index: 100;
-    }
-    #outcome-card.visible {
-      opacity: 1; pointer-events: all;
-    }
-    #outcome-inner {
-      background: rgba(5,5,16,0.97);
-      border: 1px solid rgba(0,255,136,0.4);
-      border-radius: 6px;
-      padding: 36px 48px;
-      min-width: 420px;
-      transform: translateY(24px);
-      transition: transform 0.45s cubic-bezier(0.16,1,0.3,1);
-      text-align: center;
-    }
-    #outcome-card.visible #outcome-inner { transform: translateY(0); }
-    #outcome-card.failed #outcome-inner { border-color: rgba(255,32,32,0.4); }
-
-    #outcome-headline {
-      font-size: 32px; letter-spacing: 0.3em;
-      color: #00ff88; text-shadow: 0 0 24px #00ff8888;
-      margin-bottom: 6px;
-    }
-    #outcome-card.failed #outcome-headline { color: #ff4040; text-shadow: 0 0 24px #ff202088; }
-    #outcome-scenario {
-      font-size: 11px; letter-spacing: 0.18em;
-      color: rgba(255,255,255,0.35); margin-bottom: 32px;
-    }
-    #outcome-stats {
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      gap: 20px 32px; margin-bottom: 32px;
-    }
-    .stat-block { display: flex; flex-direction: column; gap: 4px; }
-    .stat-value {
-      font-size: 26px; letter-spacing: 0.06em; color: #fff;
-      text-shadow: 0 0 12px rgba(255,255,255,0.2);
-    }
-    .stat-label {
-      font-size: 10px; letter-spacing: 0.18em;
-      color: rgba(0,212,255,0.55);
-    }
-    #outcome-dismiss {
-      background: none;
-      border: 1px solid rgba(255,255,255,0.2);
-      color: rgba(255,255,255,0.45);
-      font-family: inherit; font-size: 11px; letter-spacing: 0.15em;
-      padding: 8px 24px; cursor: pointer; border-radius: 3px;
-      transition: all 0.15s;
-    }
-    #outcome-dismiss:hover {
-      border-color: rgba(255,255,255,0.5);
-      color: rgba(255,255,255,0.85);
-    }
-
-    /* ── Live satellite panel ────────────────────────────────────────────── */
-    #live-sats-panel {
-      position: absolute; top: 148px; left: 28px;
-      background: rgba(5,5,16,0.9);
-      border: 1px solid rgba(0,212,255,0.22);
-      border-radius: 4px;
-      padding: 8px 10px;
-      display: flex; flex-direction: column; gap: 6px;
-    }
-    #live-sats-header {
-      font-size: 10px; letter-spacing: 0.2em;
-      color: rgba(0,212,255,0.5); margin-bottom: 2px;
-    }
-    .sat-group-btn {
-      background: none;
-      border: 1px solid rgba(255,255,255,0.2);
-      color: rgba(255,255,255,0.45);
-      font-family: inherit; font-size: 11px; letter-spacing: 0.1em;
-      padding: 5px 10px; cursor: pointer; border-radius: 3px;
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 14px; transition: all 0.15s; text-align: left;
-    }
-    .sat-group-btn .btn-count {
-      font-size: 10px; opacity: 0.6;
-    }
-    .sat-group-btn:hover { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.7); }
-    .sat-group-btn.active { border-color: currentColor; color: var(--group-color); }
-    .sat-group-btn.loading { opacity: 0.5; pointer-events: none; }
-
     /* ── CSS2D labels (projector-sized) ─────────────────────────────────── */
-    .live-label {
-      color: rgba(255,255,255,0.7);
-      font-family: 'Courier New', monospace;
-      font-size: 11px; letter-spacing: 0.06em;
-      text-shadow: 0 0 6px rgba(255,255,255,0.5);
-      white-space: nowrap; pointer-events: none;
-    }
-    .live-label-picked {
-      color: #fff;
-      font-family: 'Courier New', monospace;
-      font-size: 13px; font-weight: bold; letter-spacing: 0.08em;
-      text-shadow: 0 0 10px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.4);
-      white-space: nowrap; pointer-events: none;
-      padding: 3px 7px;
-      background: rgba(5,5,16,0.75);
-      border: 1px solid rgba(255,255,255,0.35);
-      border-radius: 3px;
-    }
     .sat-label {
       color: rgba(0,212,255,0.85);
       font-family: 'Courier New', monospace;
@@ -310,45 +192,11 @@
       white-space: nowrap; pointer-events: none;
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-EEJE5eSJ.js"></script>
+  <script type="module" crossorigin src="/assets/index-BqknK6g4.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
   <div id="label-root"></div>
-
-  <div id="outcome-card">
-    <div id="outcome-inner">
-      <div id="outcome-headline">RESOLVED</div>
-      <div id="outcome-scenario"></div>
-      <div id="outcome-stats">
-        <div class="stat-block">
-          <div class="stat-value" id="stat-dv">—</div>
-          <div class="stat-label">TOTAL Δv (m/s)</div>
-        </div>
-        <div class="stat-block">
-          <div class="stat-value" id="stat-conjunctions">—</div>
-          <div class="stat-label">CONJUNCTIONS</div>
-        </div>
-        <div class="stat-block">
-          <div class="stat-value" id="stat-maneuvers">—</div>
-          <div class="stat-label">MANEUVERS</div>
-        </div>
-        <div class="stat-block">
-          <div class="stat-value" id="stat-rounds">—</div>
-          <div class="stat-label">NEG. ROUNDS</div>
-        </div>
-        <div class="stat-block">
-          <div class="stat-value" id="stat-time">—</div>
-          <div class="stat-label">TIME TO CLEAR (s)</div>
-        </div>
-        <div class="stat-block">
-          <div class="stat-value" id="stat-topology">—</div>
-          <div class="stat-label">TOPOLOGY</div>
-        </div>
-      </div>
-      <button id="outcome-dismiss">DISMISS</button>
-    </div>
-  </div>
 
   <div id="header">
     <div>
@@ -361,15 +209,6 @@
   <div id="phase-badge">
     <div id="phase-dot"></div>
     <div id="phase-text">ALL CLEAR</div>
-  </div>
-
-  <div id="live-sats-panel">
-    <div id="live-sats-header">SCENE LAYERS</div>
-    <button class="sat-group-btn active" id="sim-toggle" style="--group-color:#00d4ff">SIMULATION <span class="btn-count"></span></button>
-    <div style="height:1px;background:rgba(0,212,255,0.15);margin:2px 0"></div>
-    <button class="sat-group-btn" data-group="stations" style="--group-color:#ffffff">STATIONS   <span class="btn-count"></span></button>
-    <button class="sat-group-btn" data-group="starlink" style="--group-color:#5599ff">STARLINK   <span class="btn-count"></span></button>
-    <button class="sat-group-btn" data-group="active"   style="--group-color:#7799aa">ALL ACTIVE <span class="btn-count"></span></button>
   </div>
 
   <div id="log-panel">
@@ -391,7 +230,6 @@
       <option value="30">30×</option>
       <option value="60">60×</option>
     </select>
-    <button id="run-btn">▶ RUN</button>
     <button id="live-btn">🛰 LIVE</button>
     <span id="earth-status"></span>
   </div>

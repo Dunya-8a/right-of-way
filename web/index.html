@@ -179,6 +179,67 @@
       flex-shrink: 0;
     }
 
+    /* ── Outcome card ────────────────────────────────────────────────────── */
+    #outcome-card {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(5,5,16,0.72);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease;
+      z-index: 100;
+    }
+    #outcome-card.visible {
+      opacity: 1; pointer-events: all;
+    }
+    #outcome-inner {
+      background: rgba(5,5,16,0.97);
+      border: 1px solid rgba(0,255,136,0.4);
+      border-radius: 6px;
+      padding: 36px 48px;
+      min-width: 420px;
+      transform: translateY(24px);
+      transition: transform 0.45s cubic-bezier(0.16,1,0.3,1);
+      text-align: center;
+    }
+    #outcome-card.visible #outcome-inner { transform: translateY(0); }
+    #outcome-card.failed #outcome-inner { border-color: rgba(255,32,32,0.4); }
+
+    #outcome-headline {
+      font-size: 32px; letter-spacing: 0.3em;
+      color: #00ff88; text-shadow: 0 0 24px #00ff8888;
+      margin-bottom: 6px;
+    }
+    #outcome-card.failed #outcome-headline { color: #ff4040; text-shadow: 0 0 24px #ff202088; }
+    #outcome-scenario {
+      font-size: 11px; letter-spacing: 0.18em;
+      color: rgba(255,255,255,0.35); margin-bottom: 32px;
+    }
+    #outcome-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px 32px; margin-bottom: 32px;
+    }
+    .stat-block { display: flex; flex-direction: column; gap: 4px; }
+    .stat-value {
+      font-size: 26px; letter-spacing: 0.06em; color: #fff;
+      text-shadow: 0 0 12px rgba(255,255,255,0.2);
+    }
+    .stat-label {
+      font-size: 10px; letter-spacing: 0.18em;
+      color: rgba(0,212,255,0.55);
+    }
+    #outcome-dismiss {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.45);
+      font-family: inherit; font-size: 11px; letter-spacing: 0.15em;
+      padding: 8px 24px; cursor: pointer; border-radius: 3px;
+      transition: all 0.15s;
+    }
+    #outcome-dismiss:hover {
+      border-color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.85);
+    }
+
     /* ── Live satellite panel ────────────────────────────────────────────── */
     #live-sats-panel {
       position: absolute; top: 148px; left: 28px;
@@ -253,6 +314,40 @@
 <body>
   <canvas id="canvas"></canvas>
   <div id="label-root"></div>
+
+  <div id="outcome-card">
+    <div id="outcome-inner">
+      <div id="outcome-headline">RESOLVED</div>
+      <div id="outcome-scenario"></div>
+      <div id="outcome-stats">
+        <div class="stat-block">
+          <div class="stat-value" id="stat-dv">—</div>
+          <div class="stat-label">TOTAL Δv (m/s)</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-conjunctions">—</div>
+          <div class="stat-label">CONJUNCTIONS</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-maneuvers">—</div>
+          <div class="stat-label">MANEUVERS</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-rounds">—</div>
+          <div class="stat-label">NEG. ROUNDS</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-time">—</div>
+          <div class="stat-label">TIME TO CLEAR (s)</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-topology">—</div>
+          <div class="stat-label">TOPOLOGY</div>
+        </div>
+      </div>
+      <button id="outcome-dismiss">DISMISS</button>
+    </div>
+  </div>
 
   <div id="header">
     <div>
