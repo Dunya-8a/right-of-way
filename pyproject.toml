@@ -9,6 +9,8 @@ dependencies = [
     "numpy>=1.26",       # WS1 physics core — the orchestrator's default referee
     "anthropic>=0.40",   # WS2 ClaudeBrain (real-LLM agents); falls back to MockBrain w/o a key
     "weave>=0.52.41",    # WS4 Weave instrumentation — tracing + eval leaderboard
+    "fastapi>=0.136.3",
+    "uvicorn>=0.48.0",
 ]
 
 [project.optional-dependencies]

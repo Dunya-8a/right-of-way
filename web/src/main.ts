@@ -838,6 +838,32 @@ document.getElementById('live-btn')?.addEventListener('click', () => {
   fetchLiveEarth(earthMat).catch(console.warn);
 });
 
+// ── RUN SIMULATION button ─────────────────────────────────────────────────────
+{
+  const runBtn = document.getElementById('run-btn') as HTMLButtonElement | null;
+  const API = 'http://localhost:8000';
+
+  runBtn?.addEventListener('click', async () => {
+    if (!runBtn || runBtn.disabled) return;
+    runBtn.disabled = true;
+    runBtn.textContent = '⟳ RUNNING…';
+    try {
+      const resp = await fetch(`${API}/run?topology=hierarchical`, { method: 'POST' });
+      if (!resp.ok) throw new Error(`API ${resp.status}: ${await resp.text()}`);
+      const data = await resp.json() as Timeline;
+      loadTimeline(data);
+      playing = true;
+      updatePlayBtn();
+    } catch (err) {
+      console.error('Run failed:', err);
+      alert(`Simulation failed: ${err}`);
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = '▶ RUN';
+    }
+  });
+}
+
 // ── Live satellite click-to-label ─────────────────────────────────────────────
 {
   const raycaster = new THREE.Raycaster();

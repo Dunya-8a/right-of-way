@@ -163,6 +163,16 @@
       transition: background 0.15s;
     }
     #live-btn:hover { background: rgba(0,255,136,0.12); }
+    #run-btn {
+      background: none;
+      border: 1px solid rgba(255,170,0,0.6);
+      color: #ffaa00; padding: 6px 14px;
+      font-family: inherit; font-size: 12px; letter-spacing: 0.1em;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    #run-btn:hover:not(:disabled) { background: rgba(255,170,0,0.12); }
+    #run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     #earth-status {
       font-size: 10px; letter-spacing: 0.08em;
       color: rgba(0,255,136,0.6); min-width: 120px;
@@ -285,6 +295,7 @@
       <option value="30">30×</option>
       <option value="60">60×</option>
     </select>
+    <button id="run-btn">▶ RUN</button>
     <button id="live-btn">🛰 LIVE</button>
     <span id="earth-status"></span>
   </div>
