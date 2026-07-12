@@ -100,19 +100,21 @@ def generate_aeolus_scenario() -> Scenario:
     )
 
     # Filler: two operational Starlink siblings on the 550 km shell, same plane,
-    # offset along-track — constant ~hundreds-of-km separation, never conjoin.
+    # offset far along-track (~±13 min ≈ ±5800 km) — they read as "the rest of
+    # the constellation, elsewhere" instead of crowding the encounter, and the
+    # separation is constant so they never conjoin with anything.
     shell_axis = _motion_axis(53.0)
     starlink_43 = SpaceObject(
         id="STARLINK-43",
         type="sat",
-        state=_crossing_orbit_state(_R_SHELL, _X, shell_axis, TCA_S + 40.0),
+        state=_crossing_orbit_state(_R_SHELL, _X, shell_axis, TCA_S + 780.0),
         fuel_budget_dv=0.050,
         priority=3,
     )
     starlink_45 = SpaceObject(
         id="STARLINK-45",
         type="sat",
-        state=_crossing_orbit_state(_R_SHELL, _X, shell_axis, TCA_S - 40.0),
+        state=_crossing_orbit_state(_R_SHELL, _X, shell_axis, TCA_S - 780.0),
         fuel_budget_dv=0.050,
         priority=3,
     )
