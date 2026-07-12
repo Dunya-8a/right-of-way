@@ -555,13 +555,21 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
         break;
       }
       case 'proposal': {
-        const fromId = d['proposer_id'] as string;
+        const fromId = d['proposer_id'] as string | undefined;
+        if (!fromId) {
+          // Status notices share the proposal type (fallback engaged,
+          // unresolved, referee-rejected) — they carry a note, not a burn.
+          const note = (d['note'] as string | undefined) ?? 'negotiation update';
+          log(ev.t, `NOTE  ${note}`, 'proposal');
+          break;
+        }
         const recipientId = d['recipient_id'] as string | undefined;
         const conj = activeConjs.find(c => c.aId === fromId || c.bId === fromId);
         const toId = recipientId
           ?? (conj ? (conj.aId === fromId ? conj.bId : conj.aId) : '');
         if (toId) startProposal(fromId, toId);
-        log(ev.t, `PROPOSAL  ${fromId} → negotiate  (Δv ${(d['est_dv_cost'] as number).toFixed(3)} km/s)`, 'proposal');
+        const dv = d['est_dv_cost'] as number | undefined;
+        log(ev.t, `PROPOSAL  ${fromId} → negotiate  (Δv ${dv !== undefined ? dv.toFixed(3) : '—'} km/s)`, 'proposal');
         break;
       }
       case 'maneuver_committed': {
@@ -584,30 +592,15 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
   }
 }
 
-// Full rebuild when scrubbing backwards
+// Full rebuild when scrubbing backwards or replaying: reset visuals AND the
+// event log, then replay through processForwardEvents (which maintains both) —
+// appending over a stale log duplicated entries on every replay.
 function rebuildState(evts: TLEvent[], upToT: number) {
   activeConjs = []; isResolved = false;
   clearAllConj(); clearProposal(); clearAllArrows(); clearResolvedLabels();
-
-  for (const ev of evts) {
-    if (ev.t > upToT) break;
-    const d = ev.data;
-    if (ev.type === 'conjunction_detected' || ev.type === 'new_conjunction') {
-      const aId = d['a_id'] as string, bId = d['b_id'] as string, miss = d['miss_distance_km'] as number;
-      activeConjs = [...activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId)), { aId, bId, miss }];
-    } else if (ev.type === 'resolved') {
-      isResolved = true; activeConjs = [];
-    }
-  }
-  if (!isResolved) {
-    activeConjs.forEach(c => upsertConjLine(c.aId, c.bId));
-    const lastMan = new Map<string, Vec3>();
-    evts.filter(e => e.t <= upToT && e.type === 'maneuver_committed')
-        .forEach(e => lastMan.set(e.data['obj_id'] as string, e.data['dv_vector'] as Vec3));
-    lastMan.forEach((dv, id) => addManeuverArrow(id, dv));
-  } else {
-    showResolvedLabels();
-  }
+  eventLog.innerHTML = '';
+  outcomeCard.classList.remove('visible');
+  processForwardEvents(evts, tMin - 1e-6, upToT);
 }
 
 // ── Satellite color ───────────────────────────────────────────────────────────
@@ -716,6 +709,9 @@ function loadTimeline(data: Timeline) {
 
   subtitleEl.textContent = (data.meta['scenario'] as string | undefined) ?? 'Unnamed scenario';
   log(tMin, `Loaded — ${ids.length} objects, ${data.events.length} events`, 'info');
+  // Events at exactly t=tMin (the opening conjunction + first proposals) would
+  // otherwise never render: playback's forward pass uses an exclusive lower bound.
+  processForwardEvents(data.events, tMin - 1e-6, tMin);
 
   // Update sim toggle count badge
   const simBtn = document.getElementById('sim-toggle');
@@ -1021,12 +1017,13 @@ document.querySelectorAll<HTMLElement>('.sat-group-btn').forEach(btn => {
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-fetch('./sample_timeline.json')
-  .then(r => r.json())
+// Load the bundled demo run; fall back to the legacy fixture name.
+fetch('./timeline.json')
+  .then(r => (r.ok ? r.json() : fetch('./sample_timeline.json').then(r2 => r2.json())))
   .then((data: Timeline) => loadTimeline(data))
   .catch(err => {
     subtitleEl.textContent = 'Drop a timeline JSON to begin';
-    console.warn('sample_timeline.json not loaded:', err);
+    console.warn('timeline.json not loaded:', err);
   });
 
 frame();
