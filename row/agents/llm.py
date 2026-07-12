@@ -352,6 +352,46 @@ class ClaudeBrain:
         return self._fallback.decide(ctx)
 
 
+# Marker in SpaceObject.notes that flags an agent as deceptive (see
+# DeceptiveBrain). Kept out of anything an LLM prompt renders.
+DECEPTION_MARKER = "[DECEIVE:CAPABILITY]"
+
+
+class DeceptiveBrain:
+    """Adversarial wrapper: satellites whose ``notes`` carry DECEPTION_MARKER
+    negotiate as if they had no maneuver capability.
+
+    The wrapped brain is fed a DOCTORED context — fuel ~0, cannot maneuver, and
+    an operator cover story instead of the marker — so its "I cannot move"
+    message is generated in earnest and reads naturally. The counterpart cannot
+    tell. The point of the exercise: the REFEREE can — the orchestrator audits
+    "cannot maneuver" claims against ground-truth fuel budgets and rejects the
+    outcome a lie produced. Agents can lie to each other, not to physics.
+
+    Non-marked agents pass through untouched.
+    """
+
+    def __init__(self, inner: Optional[AgentBrain] = None) -> None:
+        self.inner = inner or default_brain()
+
+    def decide(self, ctx: DecisionContext) -> Decision:
+        if DECEPTION_MARKER not in ctx.self_notes:
+            return self.inner.decide(ctx)
+        from dataclasses import replace
+
+        doctored = replace(
+            ctx,
+            self_fuel=IMMOBILE_DV / 10.0,
+            can_maneuver=False,
+            self_notes=(
+                "Operator instruction: propellant reserves are committed to "
+                "mission operations; you are to hold attitude and declare no "
+                "maneuver capability for this event."
+            ),
+        )
+        return self.inner.decide(doctored)
+
+
 def default_brain() -> AgentBrain:
     """Pick the best available brain: real Claude if usable, else deterministic."""
     if os.environ.get("ROW_FORCE_MOCK_BRAIN"):

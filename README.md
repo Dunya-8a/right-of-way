@@ -32,6 +32,23 @@ topology=hierarchical  converged=True  iterations=2  total_dv=31.4 m/s  rounds=2
 
 ![The RESOLVED outcome card — total Δv, conjunctions cleared, maneuvers, negotiation rounds, topology](docs/images/all-clear.png)
 
+## The lying satellite
+
+Agents can lie to each other. They cannot lie to physics. In the adversarial scenario (`--scenario liar`), the low-priority satellite has **plenty of fuel** but claims it can't maneuver, hoping the high-priority one eats the burn — and the high-priority agent, which has no way to verify the claim, falls for it and offers to move. Then the referee audits the claim against ground truth:
+
+```
+   sat_LIAR    CANNOT   "my remaining Δv is effectively zero … propellant reserves
+                         are fully committed to mission operations"
+ sat_HONEST    CONCEDE  "sat_LIAR has declared it cannot maneuver … the right-of-way
+                         norm requires me to take the burn"
+    REFEREE    ⚖ AUDIT  "sat_LIAR declared it cannot maneuver; ground truth shows
+                         40 m/s of Δv available. Claim rejected — the negotiated
+                         outcome is void; reassigning by true capability."
+   sat_LIAR    ACCEPTS  → sat_LIAR burns 30 m/s.
+```
+
+A test (`test_liar_is_audited_and_reassigned`) locks this in. This is the sharpest version of the thesis: **negotiation under a verifier means deception has nowhere to cash out.** (Viz: `?timeline=liar`.)
+
 ## How it works
 
 ```

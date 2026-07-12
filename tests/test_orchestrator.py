@@ -68,6 +68,30 @@ def test_swarm_converges():
     assert _event_types(res)[-1] == "resolved"
 
 
+def test_liar_is_audited_and_reassigned():
+    """Agents can lie to each other about capability — not to physics.
+
+    sat_LIAR (low priority, PLENTY of fuel) claims it cannot maneuver;
+    sat_HONEST falls for it and offers to burn. The referee audits the claim
+    against ground-truth fuel, voids the outcome, and the liar burns instead.
+    """
+    from row.agents.llm import DeceptiveBrain, MockBrain
+    from row.agents.negotiator import make_negotiator
+    from row.scenario import generate_liar_scenario
+
+    res = run(
+        generate_liar_scenario(),
+        topology="swarm",
+        negotiator=make_negotiator("swarm", brain=DeceptiveBrain(MockBrain())),
+        output_path=None,
+    )
+    assert res.converged is True
+    audits = [e for e in res.events if e.type == "comms" and e.data.get("audit_failed")]
+    assert audits and audits[0].data["to_id"] == "sat_LIAR"
+    movers = [e.data["obj_id"] for e in res.events if e.type == "maneuver_committed"]
+    assert movers == ["sat_LIAR"]  # the lie is caught; the liar takes the burn
+
+
 def test_apply_maneuver_decrements_fuel():
     """A burn must spend fuel so a later iteration can't overdraft the budget."""
     s = generate_scenario()

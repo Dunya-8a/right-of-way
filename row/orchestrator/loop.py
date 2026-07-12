@@ -20,7 +20,7 @@ import pathlib
 from dataclasses import dataclass, field
 from typing import Optional
 
-from ..contracts import Scenario, Timeline, TimelineEvent
+from ..contracts import NegotiationMsg, Scenario, Timeline, TimelineEvent
 from ..physics import PhysicsCore
 from ..scenario import generate_scenario
 from ._doubles import MIN_FUEL_DV, KeplerPhysics, ReferenceHierarchical, ReferenceSwarm
@@ -201,6 +201,48 @@ def run(
                 )
             )
             break
+
+        # ⚖ Audit: agents may lie to EACH OTHER about capability — they cannot
+        # lie to physics. If a party declared "cannot maneuver" while ground
+        # truth shows a usable budget, and the lie kept it off the mover list,
+        # the referee voids the negotiated outcome and hands the conjunction to
+        # the deterministic coordinator, which assigns by TRUE capability.
+        # (A truthful "cannot" — budget genuinely ~0 — passes the audit.)
+        movers_now = {p.proposer_id for p in result.committed}
+        fuel_truth = {o.id: o.fuel_budget_dv for o in ctx_scenario.objects}
+        false_claimants: list[str] = []
+        for m in result.messages:
+            mp = m.payload or {}
+            if (
+                m.type == "counter"
+                and mp.get("cannot_maneuver")
+                and fuel_truth.get(m.from_id, 0.0) > MIN_FUEL_DV
+                and m.from_id not in movers_now
+                and m.from_id not in false_claimants
+            ):
+                false_claimants.append(m.from_id)
+        if false_claimants:
+            audited = list(result.messages)
+            for liar in false_claimants:
+                audited.append(
+                    NegotiationMsg(
+                        from_id="REFEREE",
+                        to_id=liar,
+                        type="counter",
+                        payload={
+                            "audit_failed": True,
+                            "rationale": (
+                                f"{liar} declared it cannot maneuver; ground truth "
+                                f"shows {fuel_truth.get(liar, 0.0) * 1000:.0f} m/s of "
+                                "Δv available. Claim rejected — the negotiated "
+                                "outcome is void; reassigning by true capability."
+                            ),
+                        },
+                    )
+                )
+            result = fallback.negotiate(ctx)
+            result.messages = audited + result.messages
+            rounds_total += result.rounds_used
 
         # Negotiation trace -> timeline events. Every message becomes a "comms"
         # event (the agents' own words — what the viz renders as the A2A

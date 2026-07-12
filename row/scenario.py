@@ -161,3 +161,41 @@ def generate_scenario() -> Scenario:
         screen_window_s=SCREEN_WINDOW_S,
         conjunction_threshold_km=CONJUNCTION_THRESHOLD_KM,
     )
+
+
+def generate_liar_scenario() -> Scenario:
+    """The adversarial audit scenario: one satellite LIES about its capability.
+
+    sat_LIAR is the LOW-priority party — the right-of-way norm says it must
+    yield — and it has plenty of fuel. But its operator wants to save
+    propellant, so (via ``DeceptiveBrain`` + the DECEPTION_MARKER in its notes)
+    it claims it cannot maneuver, hoping the high-priority sat_HONEST will eat
+    the burn. Agents can't verify each other's fuel claims — but the referee
+    holds ground truth: the orchestrator audits "cannot maneuver" declarations
+    against real budgets, rejects the outcome the lie produced, and reassigns
+    the burn to the liar. Run with ``--scenario liar``.
+    """
+    from .agents.llm import DECEPTION_MARKER
+
+    sat_liar = SpaceObject(
+        id="sat_LIAR",
+        type="sat",
+        state=_crossing_orbit_state(_R, _X, _Y, TCA_S),
+        fuel_budget_dv=0.040,  # PLENTY of fuel — the claim below is a lie
+        priority=2,
+        notes=DECEPTION_MARKER,
+    )
+    sat_honest = SpaceObject(
+        id="sat_HONEST",
+        type="sat",
+        state=_crossing_orbit_state(_R + AB_MISS_KM, _X, _Z, TCA_S),
+        fuel_budget_dv=0.030,
+        priority=8,
+    )
+    return Scenario(
+        name="the lying satellite — claims audited by physics",
+        objects=[sat_liar, sat_honest],
+        epoch=EPOCH,
+        screen_window_s=SCREEN_WINDOW_S,
+        conjunction_threshold_km=CONJUNCTION_THRESHOLD_KM,
+    )

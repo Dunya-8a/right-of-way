@@ -580,7 +580,9 @@ function applyOneEvent(ev: TLEvent) {
         if (lastCommsCollapsed) break; // a restated stance isn't a new story beat
         const from = String(d['from_id'] ?? '?').toUpperCase();
         const words = (d['rationale'] as string | undefined) ?? '';
-        if (d['cannot_maneuver']) {
+        if (d['audit_failed']) {
+          enqueueCaption('⚖ THE REFEREE CAUGHT A LIE', firstSentence(words), '#ff6b6b');
+        } else if (d['cannot_maneuver']) {
           enqueueCaption(`${from}: “I CANNOT MOVE”`, firstSentence(words), '#ff6b6b');
         } else if (d['concede_row']) {
           enqueueCaption(`${from} CONCEDES RIGHT-OF-WAY`, firstSentence(words), '#ffb03a');
@@ -771,6 +773,7 @@ function log(t: number, msg: string, cls: string) {
 const SAT_CHAT_COLORS = ['#58c7ff', '#ffb03a', '#c792ea', '#3ddc97', '#ff8fa3', '#9fb4c7'];
 const chatColors = new Map<string, string>();
 function satChatColor(id: string): string {
+  if (id === 'REFEREE') return '#cfeaff'; // the physics referee speaks in white-blue
   if (!chatColors.has(id)) chatColors.set(id, SAT_CHAT_COLORS[chatColors.size % SAT_CHAT_COLORS.length]);
   return chatColors.get(id)!;
 }
@@ -783,6 +786,7 @@ let lastCommsCollapsed = false; // did the most recent addComms fold into an old
 let bubbleBatch = 0; // bubbles added in the current forward pass (staggers entry)
 
 function commsBadge(d: Record<string, unknown>): { label: string; cls: string } {
+  if (d['audit_failed'])    return { label: '⚖ AUDIT — CLAIM REJECTED', cls: 'k-cannot' };
   if (d['cannot_maneuver']) return { label: 'CANNOT MANEUVER', cls: 'k-cannot' };
   if (d['assert_row'])      return { label: 'ASSERTS RIGHT-OF-WAY', cls: 'k-assert' };
   if (d['concede_row'])     return { label: 'CONCEDES — TAKES THE BURN', cls: 'k-concede' };
