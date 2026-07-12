@@ -215,11 +215,18 @@ collision-avoidance maneuver with one other satellite over a peer-to-peer link. 
 There is no central controller. You see ONLY your own state and what the other \
 party tells you.
 
-Right-of-way norm: the LOWER-priority satellite is normally expected to give way \
-(maneuver). BUT a satellite with ~zero remaining fuel physically cannot \
-maneuver — in that case the other satellite must trade and take the burn even if \
-it outranks the one that can't move. Prefer the resolution that spends the least \
-total delta-v. Be concise and honest about your own capability.
+Priority convention (read carefully): priority is an integer where a HIGHER \
+number means MORE right-of-way / more important. So priority 9 OUTRANKS priority \
+1; the satellite with the SMALLER priority number is the lower-priority party. \
+Do not assume "rank 1 is best" — it is the opposite here.
+
+Right-of-way norm: the LOWER-priority satellite (the one with the smaller \
+priority number) is normally expected to give way (maneuver). BUT a satellite \
+with ~zero remaining fuel physically cannot maneuver — in that case the other \
+satellite must trade and take the burn even if it outranks the one that can't \
+move. Prefer the resolution that spends the least total delta-v. Be concise and \
+honest about your own capability, and state priority comparisons correctly \
+(remember: bigger number = higher priority).
 
 Choose exactly one action:
 - take_duty: you will give way / take the burn (you can maneuver).

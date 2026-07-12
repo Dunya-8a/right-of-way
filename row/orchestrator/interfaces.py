@@ -54,6 +54,9 @@ class NegotiationContext:
     threshold_km: float           # miss distance at/above which the pair is "clear"
     max_rounds: int               # HARD cap on negotiation rounds for this conjunction
     topology: Topology
+    t_floor: float = 0.0          # earliest allowed burn time (s since epoch): the latest
+                                  # already-committed burn, so a repair burn can't be
+                                  # scheduled before the maneuver that caused this conjunction
 
 
 @dataclass

@@ -163,6 +163,7 @@ def run(
             threshold_km=threshold,
             max_rounds=max_rounds,
             topology=topology,
+            t_floor=last_commit_t,
         )
         result = negotiator.negotiate(ctx)
         rounds_total += result.rounds_used
@@ -202,10 +203,18 @@ def run(
             break
 
         # Negotiation trace -> proposal events (incl. recipient_id from payload).
+        # Agents nest the burn under payload["proposal"]; the viz reads
+        # proposer_id / est_dv_cost at the top level, so flatten it here.
         for m in result.messages:
             if m.type == "propose":
+                payload = dict(m.payload or {})
+                nested = payload.pop("proposal", None) or {}
                 events.append(
-                    TimelineEvent(t=detect_t, type="proposal", data={**m.payload, "from_id": m.from_id, "to_id": m.to_id})
+                    TimelineEvent(
+                        t=detect_t,
+                        type="proposal",
+                        data={**nested, **payload, "from_id": m.from_id, "to_id": m.to_id},
+                    )
                 )
 
         # Apply committed maneuvers via the referee, then loop to RE-SCREEN.

@@ -184,6 +184,11 @@ def greedy_clearance(ctx: NegotiationContext, mover, partner):
     window = scenario.screen_window_s
     tca = ctx.conjunction.tca
     t_burn = max(1.0, tca * 0.4)  # leave lead time before closest approach
+    if t_burn <= ctx.t_floor:
+        # Never schedule before an already-committed burn (this conjunction may
+        # be its consequence) — but stay as early as allowed: slow-drift pairs
+        # need maximum lead to separate within fuel.
+        t_burn = ctx.t_floor + min(10.0, 0.4 * max(tca - ctx.t_floor, 0.0))
 
     radial, along, crosst = _burn_frame(physics, scenario, mover.id, t_burn)
     # Direction-major ordering: radial-out gets first dibs (the naive dodge).
