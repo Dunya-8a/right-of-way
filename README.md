@@ -3,7 +3,7 @@
 
 > **We gave satellites a group chat to keep them from crashing into each other.**
 
-![Right of Way live: two satellites on a collision course — 1.5 km and 3.0 km separation, sat_B's maneuver vector firing, the physics referee flagging two active conjunctions, over a real NASA Earth](docs/images/hero-conjunction.png)
+![Right of Way live: two satellites on a collision course over a real NASA Earth, while the A2A comms channel shows the agents negotiating in plain English — sat_B conceding right-of-way and proposing the avoidance burn](docs/images/hero-conjunction.png)
 
 When two satellites from different operators drift onto a collision course, there's no mission control to settle it — each one only knows its own fuel, its own mission, and wants the *other* one to move. **Right of Way turns them into AI agents that negotiate their own avoidance maneuvers — peer-to-peer, no central planner** — while a **deterministic physics engine referees every deal** and catches the moment one satellite's dodge creates the *next* near-miss. *Kessler syndrome, handled by conversation.*
 
@@ -46,7 +46,7 @@ topology=hierarchical  converged=True  iterations=2  total_dv=31.4 m/s  rounds=2
   t=  897.1  resolved                                               ← provably clear
 ```
 
-![The live 3D view — the forced-trade constellation over a real NASA Earth (Blue Marble + live GIBS tiles); green when the orbit is provably clear](docs/images/all-clear.png)
+![The RESOLVED outcome card — 31.4 m/s total Δv, 2 conjunctions cleared in 2 maneuvers over 7 negotiation rounds, swarm topology, the orbit provably clear](docs/images/all-clear.png)
 
 ## How it works
 
