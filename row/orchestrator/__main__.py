@@ -14,11 +14,24 @@ from . import run
 def main() -> None:
     p = argparse.ArgumentParser(description="Right of Way orchestrator (WS3).")
     p.add_argument("--topology", choices=["hierarchical", "swarm"], default="hierarchical")
+    p.add_argument(
+        "--scenario",
+        choices=["forced-trade", "aeolus"],
+        default="forced-trade",
+        help="forced-trade: the synthetic proof scenario; "
+        "aeolus: the Sept 2019 Aeolus/Starlink-44 re-enactment",
+    )
     p.add_argument("--out", default="web/public/timeline.json", help="Timeline JSON output path")
     p.add_argument("--dt", type=float, default=20.0, help="frame cadence (s)")
     args = p.parse_args()
 
-    res = run(topology=args.topology, dt_seconds=args.dt, output_path=args.out)
+    scenario = None
+    if args.scenario == "aeolus":
+        from row.scenario_real import generate_aeolus_scenario
+
+        scenario = generate_aeolus_scenario()
+
+    res = run(scenario, topology=args.topology, dt_seconds=args.dt, output_path=args.out)
 
     print(f"topology={res.topology}  converged={res.converged}  "
           f"iterations={res.iterations}  total_dv={res.total_dv_km_s*1000:.1f} m/s  "

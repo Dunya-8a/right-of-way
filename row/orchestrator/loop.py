@@ -311,7 +311,7 @@ def run(
             "total_dv_km_s": round(total_dv, 6),
             "rounds_total": rounds_total,
             "iterations": iteration,
-            "scenario": "forced-trade demo",
+            "scenario": scenario.name,
         },
     )
 

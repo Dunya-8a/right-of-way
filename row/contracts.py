@@ -48,11 +48,20 @@ class SpaceObject(BaseModel):
         ..., description="Remaining maneuver budget in km/s. ~0 means it cannot move."
     )
     priority: int = Field(..., description="Higher = more important / more right of way.")
+    notes: str = Field(
+        default="",
+        description="Operational context fed to the object's agent brain "
+        "(mission, operator, constraints). Free text; empty for synthetic sats.",
+    )
 
 
 class Scenario(BaseModel):
     """The full world the orchestrator steps through."""
 
+    name: str = Field(
+        default="forced-trade demo",
+        description="Human-readable scenario name (shown by the viz).",
+    )
     objects: list[SpaceObject]
     epoch: str = Field(..., description="ISO-8601 UTC timestamp for t=0.")
     screen_window_s: int = Field(

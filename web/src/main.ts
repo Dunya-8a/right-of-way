@@ -1341,9 +1341,12 @@ document.querySelectorAll<HTMLElement>('.sat-group-btn').forEach(btn => {
 // Load the bundled demo run; fall back to the legacy fixture name.
 // URL params for recording clips: ?clean hides the operator chrome,
 // ?autoplay starts the story on load.
+// ?timeline=forced-trade loads ./timeline-forced-trade.json (etc.).
 const bootParams = new URLSearchParams(location.search);
 if (bootParams.has('clean')) document.body.classList.add('clean');
-fetch('./timeline.json')
+const tlName = bootParams.get('timeline');
+const tlFile = tlName ? `./timeline-${tlName}.json` : './timeline.json';
+fetch(tlFile)
   .then(r => (r.ok ? r.json() : fetch('./sample_timeline.json').then(r2 => r2.json())))
   .then((data: Timeline) => {
     loadTimeline(data);

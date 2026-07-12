@@ -71,6 +71,7 @@ class Agent:
         self.asserted_row = False
         # Facts learned over A2A.
         self._heard_cannot = False
+        self._heard_cannot_reason = ""
         self._heard_assert_row = False
         self._heard_proposed = False
         self._heard_accept = False
@@ -122,6 +123,9 @@ class Agent:
         if msg.type == "counter":
             if p.get("cannot_maneuver"):
                 self._heard_cannot = True
+                # Keep the counterpart's own stated reason: the brain should
+                # respond to what was actually said, not re-attribute it.
+                self._heard_cannot_reason = p.get("rationale", "") or self._heard_cannot_reason
             if p.get("assert_row"):
                 self._heard_assert_row = True
         elif msg.type == "propose":
@@ -139,6 +143,7 @@ class Agent:
             self_id=self.id,
             self_priority=self.obj.priority,
             self_fuel=self.obj.fuel_budget_dv,
+            self_notes=getattr(self.obj, "notes", ""),
             can_maneuver=self.can_maneuver,
             counterpart_id=self.counterpart_id,
             counterpart_priority=self.counterpart_priority,
@@ -147,6 +152,7 @@ class Agent:
             rel_speed=self.rel_speed,
             neighbors=list(self.neighbors),
             counterpart_cannot_maneuver=self._heard_cannot,
+            counterpart_cannot_reason=self._heard_cannot_reason,
             counterpart_asserted_row=self._heard_assert_row,
             counterpart_has_proposed=self._heard_proposed,
             counterpart_accepted=self._heard_accept,

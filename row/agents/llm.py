@@ -69,6 +69,7 @@ class DecisionContext:
     neighbors: list[tuple[str, int, float]] = field(default_factory=list)
     # Facts accumulated from the A2A inbox over prior rounds:
     counterpart_cannot_maneuver: bool = False
+    counterpart_cannot_reason: str = ""  # the counterpart's own words for why
     counterpart_asserted_row: bool = False
     counterpart_has_proposed: bool = False
     counterpart_accepted: bool = False
@@ -77,6 +78,9 @@ class DecisionContext:
     i_declared_cannot: bool = False
     i_asserted_row: bool = False
     round: int = 0
+    # Operational context for THIS agent (mission, operator, constraints) from
+    # SpaceObject.notes — lets a real-world scenario speak in its own voice.
+    self_notes: str = ""
 
 
 @dataclass
@@ -287,7 +291,16 @@ class ClaudeBrain:
     def _user_prompt(self, ctx: DecisionContext) -> str:
         heard = []
         if ctx.counterpart_cannot_maneuver:
-            heard.append(f"{ctx.counterpart_id} says it CANNOT maneuver (no fuel).")
+            reason = (
+                f' Its stated reason, verbatim: "{ctx.counterpart_cannot_reason}"'
+                if ctx.counterpart_cannot_reason
+                else ""
+            )
+            heard.append(
+                f"{ctx.counterpart_id} has declared it CANNOT maneuver."
+                f"{reason} Respond to its actual reason — do not re-attribute it "
+                "(e.g. do not call it a fuel emergency unless IT did)."
+            )
         if ctx.counterpart_asserted_row:
             heard.append(f"{ctx.counterpart_id} asserted right-of-way over you.")
         if ctx.counterpart_has_proposed:
@@ -297,10 +310,15 @@ class ClaudeBrain:
             ", ".join(f"{i}(prio {p}, {d:.0f} km)" for i, p, d in ctx.neighbors)
             or "none in range"
         )
+        mission = (
+            f" Mission context (speak from this, in first person): {ctx.self_notes}"
+            if ctx.self_notes
+            else ""
+        )
         return (
             f"You are {ctx.self_id} (priority {ctx.self_priority}, remaining Δv "
             f"{ctx.self_fuel:.4f} km/s, {'CAN' if ctx.can_maneuver else 'CANNOT'} "
-            f"maneuver). Conjunction with {ctx.counterpart_id} (priority "
+            f"maneuver).{mission} Conjunction with {ctx.counterpart_id} (priority "
             f"{ctx.counterpart_priority}): miss {ctx.miss_distance_km:.2f} km, TCA "
             f"in {ctx.tca:.0f} s, closing {ctx.rel_speed:.1f} km/s. Nearby objects: "
             f"{nb}. Negotiation so far: {heard_str} Round {ctx.round}. "
