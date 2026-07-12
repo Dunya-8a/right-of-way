@@ -543,6 +543,12 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
   bubbleBatch = 0;
   for (const ev of evts) {
     if (ev.t <= fromT || ev.t > toT) continue;
+    applyOneEvent(ev);
+  }
+}
+
+function applyOneEvent(ev: TLEvent) {
+  {
     const d = ev.data;
     switch (ev.type) {
       case 'conjunction_detected':
@@ -551,7 +557,10 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
         const miss = d['miss_distance_km'] as number;
         activeConjs = [...activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId)), { aId, bId, miss }];
         upsertConjLine(aId, bId);
-        const prefix = ev.type === 'new_conjunction' ? 'NEW CONJUNCTION' : 'CONJUNCTION';
+        episodeBubbles.clear(); // a new conjunction opens a new negotiation episode
+        const prefix = ev.type === 'new_conjunction'
+          ? '⚖ RE-SCREEN ✗  NEW CONJUNCTION'
+          : 'CONJUNCTION';
         log(ev.t, `${prefix}  ${aId} / ${bId}  —  miss ${miss.toFixed(1)} km`, 'danger');
         if (ev.type === 'new_conjunction') {
           enqueueCaption(
@@ -568,6 +577,7 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
       }
       case 'comms': {
         addComms(d);
+        if (lastCommsCollapsed) break; // a restated stance isn't a new story beat
         const from = String(d['from_id'] ?? '?').toUpperCase();
         const words = (d['rationale'] as string | undefined) ?? '';
         if (d['cannot_maneuver']) {
@@ -600,7 +610,7 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
         clearProposal();
         addManeuverArrow(objId, d['dv_vector'] as Vec3);
         const dvMs = (d['est_dv_cost'] as number) * 1000;
-        log(ev.t, `BURN  ${objId}  —  Δv ${dvMs.toFixed(1)} m/s`, 'maneuver');
+        log(ev.t, `⚖ ✓ BURN  ${objId}  —  Δv ${dvMs.toFixed(1)} m/s`, 'maneuver');
         enqueueCaption(`BURN — ${objId.toUpperCase()}`, `Δv ${dvMs.toFixed(1)} m/s, verified by the physics referee`, '#ffa060');
         break;
       }
@@ -619,6 +629,80 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
   }
 }
 
+// ── Story mode — narrated playback ────────────────────────────────────────────
+// Negotiations happen at a single sim instant, so raw playback dumps them in a
+// blink. In story mode the orbital clock FREEZES at each event cluster and the
+// beats play out one at a time on the wall clock — including a synthetic
+// referee beat before every committed burn (the physics check made visible).
+type RefereeBeat = { type: 'referee-verify'; t: number; data: Record<string, unknown> };
+type NarrationItem = TLEvent | RefereeBeat;
+
+let guided = true;
+let narrating = false;
+let narrationQueue: NarrationItem[] = [];
+let narrationNextMs = 0;
+
+function beatDuration(item: NarrationItem): number {
+  let base: number;
+  if (item.type === 'comms') {
+    const len = ((item.data['rationale'] as string | undefined) ?? '').length;
+    base = Math.min(1200 + len * 8, 2800); // reading time scales with the words
+  } else if (item.type === 'referee-verify') base = 1400;
+  else if (item.type === 'conjunction_detected' || item.type === 'new_conjunction') base = 2000;
+  else base = 1100;
+  // The speed selector also paces the story: 60× reads brisk, 10× leisurely.
+  return base * Math.min(1.5, Math.max(0.5, 30 / speed));
+}
+
+function buildNarration(evts: TLEvent[]): NarrationItem[] {
+  const out: NarrationItem[] = [];
+  for (const e of evts) {
+    if (e.type === 'proposal') {
+      applyOneEvent(e); // overlay-only (burn-intent arc) — not a story beat
+      continue;
+    }
+    if (e.type === 'maneuver_committed') out.push({ type: 'referee-verify', t: e.t, data: e.data });
+    out.push(e);
+  }
+  return out;
+}
+
+function applyRefereeBeat(beat: RefereeBeat) {
+  const objId = String(beat.data['obj_id'] ?? '?');
+  log(beat.t, `⚖ REFEREE  VERIFYING ${objId}'s burn — propagate → screen → fuel check…`, 'referee');
+  enqueueCaption(
+    'PHYSICS REFEREE — VERIFYING',
+    `does ${objId}'s burn actually clear? propagation, conjunction screening, fuel budget`,
+    '#9fd8ff',
+  );
+}
+
+function stepNarration(nowMs: number) {
+  if (nowMs < narrationNextMs) return;
+  const item = narrationQueue.shift();
+  if (item) {
+    bubbleBatch = 0;
+    if (item.type === 'referee-verify') applyRefereeBeat(item as RefereeBeat);
+    else applyOneEvent(item as TLEvent);
+    // A message that folded into an existing bubble isn't a new beat — move on.
+    const dwell = item.type === 'comms' && lastCommsCollapsed ? 350 : beatDuration(item);
+    narrationNextMs = nowMs + dwell;
+  }
+  if (!narrationQueue.length && nowMs >= narrationNextMs - 1) narrating = false;
+}
+
+// Apply any half-narrated beats instantly (scrub, story-mode toggle, replay).
+function flushNarration() {
+  if (!narrating && !narrationQueue.length) return;
+  suppressCaptions = true;
+  for (const item of narrationQueue) {
+    if (item.type !== 'referee-verify') applyOneEvent(item as TLEvent);
+  }
+  suppressCaptions = false;
+  narrationQueue = [];
+  narrating = false;
+}
+
 // Full rebuild when scrubbing backwards or replaying: reset visuals AND the
 // event log, then replay through processForwardEvents (which maintains both) —
 // appending over a stale log duplicated entries on every replay.
@@ -629,6 +713,8 @@ function rebuildState(evts: TLEvent[], upToT: number) {
   outcomeCard.classList.remove('visible');
   resetComms();
   resetCaptions();
+  narrationQueue = [];
+  narrating = false;
   suppressCaptions = true; // a scrub is not a story beat
   processForwardEvents(evts, tMin - 1e-3, upToT);
   suppressCaptions = false;
@@ -690,7 +776,10 @@ function satChatColor(id: string): string {
 }
 
 const chatSides = new Map<string, 'left' | 'right'>();
-let lastBubble: { from: string; badge: string; el: HTMLElement; rounds: number } | null = null;
+// One bubble per (sender, stance) per episode: negotiation rounds re-send the
+// same stances, and repeats fold into the first bubble's rounds counter.
+const episodeBubbles = new Map<string, { el: HTMLElement; rounds: number }>();
+let lastCommsCollapsed = false; // did the most recent addComms fold into an old bubble?
 let bubbleBatch = 0; // bubbles added in the current forward pass (staggers entry)
 
 function commsBadge(d: Record<string, unknown>): { label: string; cls: string } {
@@ -712,19 +801,21 @@ function addComms(d: Record<string, unknown>) {
   const { label, cls } = commsBadge(d);
   const rationale = (d['rationale'] as string | undefined) ?? '';
 
-  // Consecutive repeats from the same sender with the same intent are one
-  // beat, re-sent across negotiation rounds — collapse them into a counter.
-  if (lastBubble && lastBubble.from === from && lastBubble.badge === label) {
-    lastBubble.rounds += 1;
-    let tag = lastBubble.el.querySelector<HTMLElement>('.comms-rounds');
+  const key = `${from}|${label}`;
+  const prev = episodeBubbles.get(key);
+  if (prev) {
+    prev.rounds += 1;
+    let tag = prev.el.querySelector<HTMLElement>('.comms-rounds');
     if (!tag) {
       tag = document.createElement('div');
       tag.className = 'comms-rounds';
-      lastBubble.el.appendChild(tag);
+      prev.el.appendChild(tag);
     }
-    tag.textContent = `REPEATED OVER ${lastBubble.rounds} ROUNDS`;
+    tag.textContent = `RESTATED — ${prev.rounds} ROUNDS`;
+    lastCommsCollapsed = true;
     return;
   }
+  lastCommsCollapsed = false;
 
   if (!chatSides.has(from)) chatSides.set(from, chatSides.size % 2 ? 'right' : 'left');
 
@@ -757,11 +848,12 @@ function addComms(d: Record<string, unknown>) {
 
   eventLog.appendChild(el);
   eventLog.scrollTop = eventLog.scrollHeight;
-  lastBubble = { from, badge: label, el, rounds: 1 };
+  episodeBubbles.set(key, { el, rounds: 1 });
 }
 
 function resetComms() {
-  lastBubble = null;
+  episodeBubbles.clear();
+  lastCommsCollapsed = false;
   bubbleBatch = 0;
   // keep chatColors/chatSides stable across replays so identities don't shift
 }
@@ -886,6 +978,8 @@ function loadTimeline(data: Timeline) {
 
   resetComms();
   resetCaptions();
+  narrationQueue = [];
+  narrating = false;
   log(tMin, `Loaded — ${ids.length} objects, ${data.events.length} events`, 'info');
   // Start a hair before tMin so events at exactly t=tMin (the opening
   // conjunction + first messages) unfold ON PLAY — the story starts live.
@@ -917,16 +1011,42 @@ function frame() {
   requestAnimationFrame(frame);
 
   const nowMs = performance.now();
-  const dtMs  = nowMs - lastMs;
+  // Clamp the frame delta: after a background-tab rAF stall the sim clock
+  // would otherwise lurch across whole story beats in one frame.
+  const dtMs  = Math.min(nowMs - lastMs, 100);
   lastMs = nowMs;
 
   if (tl) {
     if (playing) {
-      const prev = playTime;
-      playTime = Math.min(tMax, playTime + (dtMs / 1000) * speed);
-      processForwardEvents(tl.events, prev, playTime);
-      if (playTime >= tMax) { playing = false; updatePlayBtn(); }
-      scrubber.value = String(Math.round(((playTime - tMin) / (tMax - tMin)) * 1000));
+      if (narrating) {
+        stepNarration(nowMs); // orbital clock frozen while the story beat plays
+      } else {
+        const prev = playTime;
+        let dt = (dtMs / 1000) * speed;
+        if (guided) {
+          // Quiet-span compression: nothing happens between beats, so reach
+          // the next event (or the end) in ~4s of wall time instead of coasting.
+          const nextT = tl.events.find(e => e.t > playTime + 1e-6)?.t ?? tMax;
+          if ((nextT - playTime) / speed > 4.5) dt = (dtMs / 1000) * ((nextT - playTime) / 4);
+        }
+        playTime = Math.min(tMax, playTime + dt);
+        if (guided) {
+          const first = tl.events.find(e => e.t > prev && e.t <= playTime);
+          if (first) {
+            // Clamp to the first crossed cluster and narrate it beat by beat.
+            playTime = first.t;
+            narrationQueue = buildNarration(
+              tl.events.filter(e => e.t > prev && Math.abs(e.t - first.t) < 0.5),
+            );
+            narrating = true;
+            narrationNextMs = nowMs;
+          }
+        } else {
+          processForwardEvents(tl.events, prev, playTime);
+        }
+        if (playTime >= tMax && !narrating) { playing = false; updatePlayBtn(); }
+        scrubber.value = String(Math.round(((playTime - tMin) / (tMax - tMin)) * 1000));
+      }
     }
 
     trailTick++;
@@ -1041,6 +1161,7 @@ scrubber.addEventListener('input', () => {
   const newT = tMin + frac * (tMax - tMin);
   const wasPlaying = playing;
   playing = false;
+  flushNarration();
 
   if (newT < playTime) {
     rebuildState(tl.events, newT);
@@ -1061,6 +1182,13 @@ scrubber.addEventListener('input', () => {
 });
 
 speedSel.addEventListener('change', () => { speed = parseFloat(speedSel.value); });
+
+const storyBtn = document.getElementById('story-btn');
+storyBtn?.addEventListener('click', () => {
+  guided = !guided;
+  if (!guided) flushNarration();
+  storyBtn.classList.toggle('on', guided);
+});
 
 document.getElementById('live-btn')?.addEventListener('click', () => {
   fetchLiveEarth(earthMat).catch(console.warn);
@@ -1211,9 +1339,20 @@ document.querySelectorAll<HTMLElement>('.sat-group-btn').forEach(btn => {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 // Load the bundled demo run; fall back to the legacy fixture name.
+// URL params for recording clips: ?clean hides the operator chrome,
+// ?autoplay starts the story on load.
+const bootParams = new URLSearchParams(location.search);
+if (bootParams.has('clean')) document.body.classList.add('clean');
 fetch('./timeline.json')
   .then(r => (r.ok ? r.json() : fetch('./sample_timeline.json').then(r2 => r2.json())))
-  .then((data: Timeline) => loadTimeline(data))
+  .then((data: Timeline) => {
+    loadTimeline(data);
+    if (bootParams.has('autoplay')) {
+      playing = true;
+      dismissStickyCaption();
+      updatePlayBtn();
+    }
+  })
   .catch(err => {
     subtitleEl.textContent = 'Drop a timeline JSON to begin';
     console.warn('timeline.json not loaded:', err);

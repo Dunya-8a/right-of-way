@@ -105,6 +105,19 @@
     .log-entry.proposal{ color: #ffcc66; }
     .log-entry.maneuver{ color: #ffa060; }
     .log-entry.info    { color: rgba(255,255,255,0.4); }
+    /* ?clean — recording mode: just the globe, the comms, and the captions */
+    body.clean #live-sats-panel,
+    body.clean #drop-hint,
+    body.clean #controls { display: none; }
+    body.clean #caption { bottom: 64px; }
+
+    .log-entry.referee {
+      color: #cfeaff;
+      border: 1px dashed rgba(159,216,255,0.45);
+      border-radius: 4px;
+      background: rgba(159,216,255,0.06);
+      padding: 6px 12px;
+    }
 
     /* comms bubbles: one satellite speaking to another */
     .comms-bubble {
@@ -160,11 +173,13 @@
 
     /* ── Story captions — cinematic lower-third ──────────────────────────── */
     #caption {
-      position: absolute; left: 50%; bottom: 110px;
+      /* centered in the space LEFT of the comms panel (420px + margins) so
+         captions never run under the negotiation */
+      position: absolute; left: calc((100vw - 476px) / 2); bottom: 110px;
       transform: translateX(-50%) translateY(10px);
       text-align: center; pointer-events: none;
       opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
-      max-width: min(720px, 80vw);
+      max-width: min(640px, calc(100vw - 520px));
       z-index: 50;
     }
     #caption.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -246,6 +261,19 @@
       color: #00d4ff; padding: 6px 10px;
       font-family: inherit; font-size: 13px;
       cursor: pointer; border-radius: 4px; flex-shrink: 0;
+    }
+    #story-btn {
+      background: none;
+      border: 1px solid rgba(159,216,255,0.35);
+      color: rgba(159,216,255,0.45); padding: 6px 12px;
+      font-family: inherit; font-size: 12px; letter-spacing: 0.1em;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    #story-btn.on {
+      border-color: rgba(159,216,255,0.8);
+      color: #9fd8ff;
+      box-shadow: 0 0 10px rgba(159,216,255,0.25);
     }
     #live-btn {
       background: none;
@@ -404,7 +432,7 @@
       white-space: nowrap; pointer-events: none;
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-BkErtsvm.js"></script>
+  <script type="module" crossorigin src="/assets/index-DtZNJ_YQ.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -483,6 +511,7 @@
       <input type="range" id="scrubber" min="0" max="1000" value="0" step="1" />
     </div>
     <div id="time-display">T+00:00</div>
+    <button id="story-btn" class="on" title="Pause the orbits while each negotiation beat plays out">✦ STORY</button>
     <select id="speed-select">
       <option value="1">1×</option>
       <option value="5">5×</option>
