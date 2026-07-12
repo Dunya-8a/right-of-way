@@ -22,7 +22,7 @@
     "topology": "swarm",
     "converged": true,
     "total_dv_km_s": 0.031437,
-    "rounds_total": 10,
+    "rounds_total": 7,
     "iterations": 2,
     "scenario": "forced-trade demo"
   },
@@ -4197,20 +4197,59 @@
     },
     {
       "t": 0.0,
-      "type": "proposal",
+      "type": "comms",
       "data": {
-        "proposer_id": "sat_B",
-        "dv_vector": [
-          6.573843285669936e-06,
-          0.006629518851537295,
-          -0.006628730012732158
-        ],
-        "t_burn": 420.0001262530616,
-        "est_dv_cost": 0.009375,
-        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but since sat_A has declared it cannot maneuver due to zero fuel, I must take the burn to avoid the conjunction, and I have sufficient \u0394v (0.0600 km/s) to perform the avoidance maneuver safely.",
-        "recipient_id": "sat_A",
+        "from_id": "sat_A",
+        "to_id": "sat_B",
+        "kind": "counter",
+        "cannot_maneuver": true,
+        "rationale": "I am sat_A with priority 1 (lower priority than sat_B's priority 9) and effectively zero remaining \u0394v (0.0005 km/s), so I physically cannot maneuver and must ask sat_B, despite holding higher right-of-way, to take the burn."
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
         "from_id": "sat_B",
-        "to_id": "sat_A"
+        "to_id": "sat_A",
+        "kind": "counter",
+        "assert_row": true,
+        "rationale": "I am sat_B with priority 9, which outranks sat_A's priority 1, so sat_A is the lower-priority party and is normally expected to give way and take the maneuver burn."
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_A",
+        "to_id": "sat_B",
+        "kind": "counter",
+        "cannot_maneuver": true,
+        "rationale": "I am sat_A with priority 1 (lower priority than sat_B's priority 9) and would normally give way, but my remaining \u0394v is effectively zero (0.0005 km/s), so I physically cannot maneuver and must ask sat_B to take the burn despite its higher right-of-way."
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_B",
+        "to_id": "sat_A",
+        "kind": "yield",
+        "concede_row": true,
+        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but since sat_A has declared it cannot maneuver due to zero fuel, I must take the burn myself to avoid the conjunction \u2014 I have 0.0600 km/s of \u0394v available and will execute the avoidance maneuver."
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_B",
+        "to_id": "sat_A",
+        "kind": "propose",
+        "recipient_id": "sat_A",
+        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but since sat_A has declared it cannot maneuver due to zero fuel, I must take the burn myself to avoid the conjunction \u2014 I have 0.0600 km/s of \u0394v available and will execute the avoidance maneuver.",
+        "est_dv_cost": 0.009375,
+        "t_burn": 420.0001262530616
       }
     },
     {
@@ -4225,10 +4264,45 @@
         ],
         "t_burn": 420.0001262530616,
         "est_dv_cost": 0.009375,
-        "rationale": "I am sat_B with priority 9 (higher right-of-way) and sat_A has declared it cannot maneuver due to zero fuel, so despite my higher priority I must take the burn \u2014 I have 0.0600 km/s of \u0394v available, which is sufficient to resolve this conjunction with a miss distance of 3.00 km at TCA in 600 s.",
+        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but since sat_A has declared it cannot maneuver due to zero fuel, I must take the burn myself to avoid the conjunction \u2014 I have 0.0600 km/s of \u0394v available and will execute the avoidance maneuver.",
         "recipient_id": "sat_A",
         "from_id": "sat_B",
         "to_id": "sat_A"
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_A",
+        "to_id": "sat_B",
+        "kind": "counter",
+        "cannot_maneuver": true,
+        "rationale": "I am sat_A with priority 1 (lower priority than sat_B's priority 9) and my remaining \u0394v is effectively zero (0.0005 km/s), so I physically cannot execute a meaningful avoidance burn and must ask sat_B to take the duty despite holding right-of-way."
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_B",
+        "to_id": "sat_A",
+        "kind": "yield",
+        "concede_row": true,
+        "rationale": "I am sat_B with priority 9 (higher right-of-way) and sat_A has priority 1 (lower right-of-way), but since sat_A has declared zero fuel and physically cannot maneuver, the right-of-way norm requires me to take the burn regardless of my higher priority \u2014 I have 0.0600 km/s of \u0394v available, which is sufficient to resolve this conjunction, so I will maneuver to avoid the collision."
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_B",
+        "to_id": "sat_A",
+        "kind": "propose",
+        "recipient_id": "sat_A",
+        "rationale": "I am sat_B with priority 9 (higher right-of-way) and sat_A has priority 1 (lower right-of-way), but since sat_A has declared zero fuel and physically cannot maneuver, the right-of-way norm requires me to take the burn regardless of my higher priority \u2014 I have 0.0600 km/s of \u0394v available, which is sufficient to resolve this conjunction, so I will maneuver to avoid the collision.",
+        "est_dv_cost": 0.009375,
+        "t_burn": 420.0001262530616
       }
     },
     {
@@ -4243,10 +4317,45 @@
         ],
         "t_burn": 420.0001262530616,
         "est_dv_cost": 0.009375,
-        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but since sat_A has declared it cannot maneuver due to zero fuel, I am the only party physically capable of performing the avoidance burn, so I will take the duty and execute the maneuver to resolve the conjunction.",
+        "rationale": "I am sat_B with priority 9 (higher right-of-way) and sat_A has priority 1 (lower right-of-way), but since sat_A has declared zero fuel and physically cannot maneuver, the right-of-way norm requires me to take the burn regardless of my higher priority \u2014 I have 0.0600 km/s of \u0394v available, which is sufficient to resolve this conjunction, so I will maneuver to avoid the collision.",
         "recipient_id": "sat_A",
         "from_id": "sat_B",
         "to_id": "sat_A"
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_A",
+        "to_id": "sat_B",
+        "kind": "accept",
+        "accepts_proposer": "sat_B",
+        "rationale": "I am sat_A with priority 1 (lower priority than sat_B's priority 9) and my remaining \u0394v of 0.0005 km/s is effectively zero, so I physically cannot perform a meaningful avoidance burn; I therefore accept sat_B's proposed burn as the only viable resolution to the conjunction."
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_B",
+        "to_id": "sat_A",
+        "kind": "yield",
+        "concede_row": true,
+        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but sat_A has declared it cannot maneuver due to zero fuel, so I must take the burn to avoid the conjunction \u2014 I have sufficient remaining \u0394v (0.0600 km/s) to execute the avoidance maneuver safely."
+      }
+    },
+    {
+      "t": 0.0,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_B",
+        "to_id": "sat_A",
+        "kind": "propose",
+        "recipient_id": "sat_A",
+        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but sat_A has declared it cannot maneuver due to zero fuel, so I must take the burn to avoid the conjunction \u2014 I have sufficient remaining \u0394v (0.0600 km/s) to execute the avoidance maneuver safely.",
+        "est_dv_cost": 0.009375,
+        "t_burn": 420.0001262530616
       }
     },
     {
@@ -4261,7 +4370,7 @@
         ],
         "t_burn": 420.0001262530616,
         "est_dv_cost": 0.009375,
-        "rationale": "I am sat_B with higher priority (9) than sat_A (priority 1), but sat_A has declared it cannot maneuver due to zero fuel, so I must take the burn to avoid the conjunction \u2014 I have sufficient \u0394v (0.06 km/s) remaining to execute the avoidance maneuver safely.",
+        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but sat_A has declared it cannot maneuver due to zero fuel, so I must take the burn to avoid the conjunction \u2014 I have sufficient remaining \u0394v (0.0600 km/s) to execute the avoidance maneuver safely.",
         "recipient_id": "sat_A",
         "from_id": "sat_B",
         "to_id": "sat_A"
@@ -4279,7 +4388,7 @@
         ],
         "est_dv_cost": 0.014062499999999999,
         "t_burn": 420.0001262530616,
-        "rationale": "I am sat_B with higher priority (9) than sat_A (priority 1), but sat_A has declared it cannot maneuver due to zero fuel, so I must take the burn to avoid the conjunction \u2014 I have sufficient \u0394v (0.06 km/s) remaining to execute the avoidance maneuver safely."
+        "rationale": "I am sat_B with priority 9 (higher right-of-way than sat_A's priority 1), but sat_A has declared it cannot maneuver due to zero fuel, so I must take the burn to avoid the conjunction \u2014 I have sufficient remaining \u0394v (0.0600 km/s) to execute the avoidance maneuver safely."
       }
     },
     {
@@ -4298,20 +4407,59 @@
     },
     {
       "t": 420.0001262530616,
-      "type": "proposal",
+      "type": "comms",
       "data": {
-        "proposer_id": "sat_C",
-        "dv_vector": [
-          0.017369071822465124,
-          0.0,
-          -0.00044939337957954106
-        ],
-        "t_burn": 677.146874032434,
-        "est_dv_cost": 0.01737488447108532,
-        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party expected to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I will take the burn.",
-        "recipient_id": "sat_B",
+        "from_id": "sat_B",
+        "to_id": "sat_C",
+        "kind": "counter",
+        "assert_row": true,
+        "rationale": "I am sat_B with priority 9, which outranks sat_C's priority 5, so I hold right-of-way and request that sat_C, as the lower-priority satellite, take the avoidance burn."
+      }
+    },
+    {
+      "t": 420.0001262530616,
+      "type": "comms",
+      "data": {
         "from_id": "sat_C",
-        "to_id": "sat_B"
+        "to_id": "sat_B",
+        "kind": "counter",
+        "assert_row": true,
+        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B outranks me \u2014 however, the right-of-way norm says the LOWER-priority satellite (me, priority 5) is normally expected to give way; but since sat_B has higher priority (9) and I have lower priority (5), I should assert that sat_B, as the higher-priority party, holds right-of-way and ask sat_B to confirm \u2014 wait, re-reading the norm: the LOWER-priority satellite gives way, so I (priority 5, lower) should give way to sat_B (priority 9, higher), meaning I should take_duty."
+      }
+    },
+    {
+      "t": 420.0001262530616,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_B",
+        "to_id": "sat_C",
+        "kind": "counter",
+        "assert_row": true,
+        "rationale": "I am sat_B with priority 9, which outranks sat_C's priority 5 (higher number = more right-of-way), so sat_C's assertion of right-of-way is incorrect \u2014 I hold right-of-way and sat_C, as the lower-priority satellite, should be the one to maneuver and give way."
+      }
+    },
+    {
+      "t": 420.0001262530616,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_C",
+        "to_id": "sat_B",
+        "kind": "yield",
+        "concede_row": true,
+        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party obligated to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I accept the duty to maneuver."
+      }
+    },
+    {
+      "t": 420.0001262530616,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_C",
+        "to_id": "sat_B",
+        "kind": "propose",
+        "recipient_id": "sat_B",
+        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party obligated to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I accept the duty to maneuver.",
+        "est_dv_cost": 0.01737488447108532,
+        "t_burn": 677.146874032434
       }
     },
     {
@@ -4326,10 +4474,45 @@
         ],
         "t_burn": 677.146874032434,
         "est_dv_cost": 0.01737488447108532,
-        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party expected to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I accept the duty to maneuver.",
+        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party obligated to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I accept the duty to maneuver.",
         "recipient_id": "sat_B",
         "from_id": "sat_C",
         "to_id": "sat_B"
+      }
+    },
+    {
+      "t": 420.0001262530616,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_B",
+        "to_id": "sat_C",
+        "kind": "accept",
+        "accepts_proposer": "sat_C",
+        "rationale": "I am sat_B with priority 9, which outranks sat_C's priority 5, so sat_C's assertion of right-of-way over me was incorrect \u2014 as the higher-priority satellite I hold right-of-way; however, I have sufficient remaining \u0394v (0.0459 km/s) and, since sat_C has already proposed a burn to resolve the conjunction, I accept sat_C's proposed maneuver to achieve the most efficient resolution and avoid further delay with TCA only 857 s away."
+      }
+    },
+    {
+      "t": 420.0001262530616,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_C",
+        "to_id": "sat_B",
+        "kind": "yield",
+        "concede_row": true,
+        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party obligated to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I accept the duty to take the burn."
+      }
+    },
+    {
+      "t": 420.0001262530616,
+      "type": "comms",
+      "data": {
+        "from_id": "sat_C",
+        "to_id": "sat_B",
+        "kind": "propose",
+        "recipient_id": "sat_B",
+        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party obligated to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I accept the duty to take the burn.",
+        "est_dv_cost": 0.01737488447108532,
+        "t_burn": 677.146874032434
       }
     },
     {
@@ -4344,25 +4527,7 @@
         ],
         "t_burn": 677.146874032434,
         "est_dv_cost": 0.01737488447108532,
-        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party expected to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance burn, so I will take the maneuver duty.",
-        "recipient_id": "sat_B",
-        "from_id": "sat_C",
-        "to_id": "sat_B"
-      }
-    },
-    {
-      "t": 420.0001262530616,
-      "type": "proposal",
-      "data": {
-        "proposer_id": "sat_C",
-        "dv_vector": [
-          0.017369071822465124,
-          0.0,
-          -0.00044939337957954106
-        ],
-        "t_burn": 677.146874032434,
-        "est_dv_cost": 0.01737488447108532,
-        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party expected to give way; I have sufficient \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I will take the burn.",
+        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party obligated to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I accept the duty to take the burn.",
         "recipient_id": "sat_B",
         "from_id": "sat_C",
         "to_id": "sat_B"
@@ -4380,7 +4545,7 @@
         ],
         "est_dv_cost": 0.01737488447108532,
         "t_burn": 430.0001262530616,
-        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party expected to give way; I have sufficient \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I will take the burn."
+        "rationale": "I am sat_C with priority 5, which is lower than sat_B's priority 9, so sat_B correctly holds right-of-way and I am the lower-priority party obligated to give way; I have sufficient remaining \u0394v (0.0450 km/s) to execute the avoidance maneuver, so I accept the duty to take the burn."
       }
     },
     {
@@ -4390,7 +4555,7 @@
         "all_clear": true,
         "iterations": 2,
         "total_dv_km_s": 0.031437,
-        "rounds": 10,
+        "rounds": 7,
         "note": "No conjunctions remain over the screen window."
       }
     }
