@@ -76,7 +76,8 @@ export type TimelineEventType =
   | "proposal"
   | "maneuver_committed"
   | "resolved"
-  | "new_conjunction";
+  | "new_conjunction"
+  | "comms"; // one negotiation message (any kind) — the agents' own words
 
 export interface TimelineEvent {
   t: number;

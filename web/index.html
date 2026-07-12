@@ -56,10 +56,10 @@
     #phase-badge.danger #phase-dot { background: #ff2020; box-shadow: 0 0 12px #ff2020; }
     #phase-badge.danger #phase-text { color: #ff5050; }
 
-    /* ── Event log ───────────────────────────────────────────────────────── */
+    /* ── Comms panel — the A2A negotiation channel ───────────────────────── */
     #log-panel {
       position: absolute; top: 82px; right: 28px;
-      width: 360px;
+      width: 420px;
       background: rgba(5,5,16,0.9);
       border: 1px solid rgba(0,212,255,0.22);
       border-radius: 4px;
@@ -71,23 +71,109 @@
       color: rgba(0,212,255,0.5);
       border-bottom: 1px solid rgba(0,212,255,0.15);
       flex-shrink: 0;
+      display: flex; align-items: center; gap: 8px;
     }
+    #log-header::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: #00d4ff; box-shadow: 0 0 8px #00d4ff;
+      animation: comms-pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes comms-pulse { 0%,100% { opacity: .35 } 50% { opacity: 1 } }
     #event-log {
-      padding: 8px; overflow-y: auto; flex: 1;
+      padding: 10px; overflow-y: auto; flex: 1;
+      display: flex; flex-direction: column; gap: 8px;
     }
     #event-log::-webkit-scrollbar { width: 4px; }
     #event-log::-webkit-scrollbar-track { background: transparent; }
     #event-log::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.25); border-radius: 2px; }
+
+    /* system lines: detections, burns, verdicts — centered dividers */
     .log-entry {
-      font-size: 12px; padding: 5px 8px; margin: 2px 0;
-      border-left: 2px solid; border-radius: 1px;
-      line-height: 1.5; letter-spacing: 0.02em;
+      font-size: 11px; padding: 4px 10px;
+      line-height: 1.5; letter-spacing: 0.08em;
+      text-align: center; align-self: center;
+      max-width: 100%;
     }
-    .log-entry.safe    { color: #66ffb0; border-color: #00ff88; background: rgba(0,255,136,0.06); }
-    .log-entry.danger  { color: #ff7070; border-color: #ff2020; background: rgba(255,32,32,0.07); }
-    .log-entry.proposal{ color: #ffcc66; border-color: #ffaa00; background: rgba(255,170,0,0.07); }
-    .log-entry.maneuver{ color: #ffa060; border-color: #ff6600; background: rgba(255,100,0,0.07); }
-    .log-entry.info    { color: rgba(255,255,255,0.45); border-color: rgba(255,255,255,0.15); }
+    .log-entry.safe    { color: #66ffb0; }
+    .log-entry.danger  { color: #ff7070; }
+    .log-entry.proposal{ color: #ffcc66; }
+    .log-entry.maneuver{ color: #ffa060; }
+    .log-entry.info    { color: rgba(255,255,255,0.4); }
+
+    /* comms bubbles: one satellite speaking to another */
+    .comms-bubble {
+      max-width: 88%;
+      padding: 8px 12px 9px;
+      border-radius: 8px;
+      background: rgba(12,26,44,0.92);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-left: 2px solid var(--sat-color, #00d4ff);
+      animation: bubble-in 0.35s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .comms-bubble.right {
+      align-self: flex-end;
+      border-left: 1px solid rgba(255,255,255,0.09);
+      border-right: 2px solid var(--sat-color, #00d4ff);
+    }
+    @keyframes bubble-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .comms-bubble { animation: none; }
+    }
+    .comms-route {
+      font-size: 10px; letter-spacing: 0.14em;
+      margin-bottom: 4px;
+      display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+    }
+    .comms-from { color: var(--sat-color, #00d4ff); font-weight: bold; }
+    .comms-to   { color: rgba(255,255,255,0.4); }
+    .comms-kind {
+      margin-left: auto;
+      font-size: 9px; letter-spacing: 0.12em;
+      padding: 1px 6px; border-radius: 3px;
+      border: 1px solid currentColor;
+    }
+    .comms-kind.k-cannot  { color: #ff6b6b; }
+    .comms-kind.k-assert  { color: #58c7ff; }
+    .comms-kind.k-concede { color: #ffb03a; }
+    .comms-kind.k-propose { color: #ffcc66; }
+    .comms-kind.k-accept  { color: #3ddc97; }
+    .comms-kind.k-directive { color: #9fb4c7; }
+    .comms-text {
+      font-size: 11.5px; line-height: 1.55;
+      color: rgba(228,240,250,0.88);
+      letter-spacing: 0.01em;
+    }
+    .comms-rounds {
+      margin-top: 5px;
+      font-size: 9px; letter-spacing: 0.14em;
+      color: rgba(255,255,255,0.35);
+    }
+
+    /* ── Story captions — cinematic lower-third ──────────────────────────── */
+    #caption {
+      position: absolute; left: 50%; bottom: 110px;
+      transform: translateX(-50%) translateY(10px);
+      text-align: center; pointer-events: none;
+      opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
+      max-width: min(720px, 80vw);
+      z-index: 50;
+    }
+    #caption.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #caption-headline {
+      font-size: 21px; letter-spacing: 0.3em; font-weight: bold;
+      color: var(--cap-color, #00d4ff);
+      text-shadow: 0 0 18px var(--cap-glow, rgba(0,212,255,0.55)),
+                   0 2px 10px rgba(0,0,0,0.9);
+      margin-bottom: 6px;
+    }
+    #caption-sub {
+      font-size: 12.5px; letter-spacing: 0.08em; line-height: 1.6;
+      color: rgba(230,242,252,0.85);
+      text-shadow: 0 1px 8px rgba(0,0,0,0.95);
+    }
 
     /* ── Bottom controls ─────────────────────────────────────────────────── */
     #controls {
@@ -352,7 +438,7 @@
   <div id="header">
     <div>
       <div id="title">RIGHT OF WAY</div>
-      <div id="subtitle">Autonomous Orbital Negotiation</div>
+      <div id="subtitle">Satellites negotiating their own collision avoidance — no one in charge</div>
     </div>
     <div id="drop-hint">DROP TIMELINE JSON TO REPLACE FIXTURE</div>
   </div>
@@ -372,8 +458,13 @@
   </div>
 
   <div id="log-panel">
-    <div id="log-header">EVENT LOG</div>
+    <div id="log-header">SATELLITE COMMS — A2A CHANNEL</div>
     <div id="event-log"></div>
+  </div>
+
+  <div id="caption">
+    <div id="caption-headline"></div>
+    <div id="caption-sub"></div>
   </div>
 
   <div id="controls">
@@ -386,8 +477,8 @@
     <select id="speed-select">
       <option value="1">1×</option>
       <option value="5">5×</option>
-      <option value="10" selected>10×</option>
-      <option value="30">30×</option>
+      <option value="10">10×</option>
+      <option value="30" selected>30×</option>
       <option value="60">60×</option>
     </select>
     <button id="run-btn">▶ RUN</button>

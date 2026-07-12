@@ -202,13 +202,32 @@ def run(
             )
             break
 
-        # Negotiation trace -> proposal events (incl. recipient_id from payload).
-        # Agents nest the burn under payload["proposal"]; the viz reads
-        # proposer_id / est_dv_cost at the top level, so flatten it here.
+        # Negotiation trace -> timeline events. Every message becomes a "comms"
+        # event (the agents' own words — what the viz renders as the A2A
+        # channel); "propose" messages ALSO become flattened "proposal" events
+        # (what the viz uses for the 3D burn-intent overlay). Agents nest the
+        # burn under payload["proposal"]; consumers read est_dv_cost top-level.
         for m in result.messages:
+            payload = dict(m.payload or {})
+            nested = payload.pop("proposal", None) or {}
+            events.append(
+                TimelineEvent(
+                    t=detect_t,
+                    type="comms",
+                    data={
+                        "from_id": m.from_id,
+                        "to_id": m.to_id,
+                        "kind": m.type,
+                        **payload,
+                        **(
+                            {"est_dv_cost": nested.get("est_dv_cost"), "t_burn": nested.get("t_burn")}
+                            if nested
+                            else {}
+                        ),
+                    },
+                )
+            )
             if m.type == "propose":
-                payload = dict(m.payload or {})
-                nested = payload.pop("proposal", None) or {}
                 events.append(
                     TimelineEvent(
                         t=detect_t,

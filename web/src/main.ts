@@ -540,6 +540,7 @@ function interpolatePos(frames: Frame[], id: string, t: number): THREE.Vector3 |
 
 // ── Event processing ──────────────────────────────────────────────────────────
 function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
+  bubbleBatch = 0;
   for (const ev of evts) {
     if (ev.t <= fromT || ev.t > toT) continue;
     const d = ev.data;
@@ -552,6 +553,28 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
         upsertConjLine(aId, bId);
         const prefix = ev.type === 'new_conjunction' ? 'NEW CONJUNCTION' : 'CONJUNCTION';
         log(ev.t, `${prefix}  ${aId} / ${bId}  —  miss ${miss.toFixed(1)} km`, 'danger');
+        if (ev.type === 'new_conjunction') {
+          enqueueCaption(
+            'THE DODGE CREATED A NEW NEAR-MISS',
+            `${aId} / ${bId} — ${miss.toFixed(1)} km. Back to the negotiating table.`,
+            '#ff4d5e',
+          );
+        } else {
+          const tca = d['tca'] as number | undefined;
+          const eta = tca ? ` — closest approach in ${Math.round((tca - ev.t) / 60)} min` : '';
+          enqueueCaption('COLLISION COURSE', `${aId} / ${bId}, miss distance ${miss.toFixed(1)} km${eta}`, '#ff4d5e');
+        }
+        break;
+      }
+      case 'comms': {
+        addComms(d);
+        const from = String(d['from_id'] ?? '?').toUpperCase();
+        const words = (d['rationale'] as string | undefined) ?? '';
+        if (d['cannot_maneuver']) {
+          enqueueCaption(`${from}: “I CANNOT MOVE”`, firstSentence(words), '#ff6b6b');
+        } else if (d['concede_row']) {
+          enqueueCaption(`${from} CONCEDES RIGHT-OF-WAY`, firstSentence(words), '#ffb03a');
+        }
         break;
       }
       case 'proposal': {
@@ -563,20 +586,22 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
           log(ev.t, `NOTE  ${note}`, 'proposal');
           break;
         }
+        // Drives the 3D burn-intent overlay only; the comms bubble carries
+        // the words (older timelines without comms events still get this).
         const recipientId = d['recipient_id'] as string | undefined;
         const conj = activeConjs.find(c => c.aId === fromId || c.bId === fromId);
         const toId = recipientId
           ?? (conj ? (conj.aId === fromId ? conj.bId : conj.aId) : '');
         if (toId) startProposal(fromId, toId);
-        const dv = d['est_dv_cost'] as number | undefined;
-        log(ev.t, `PROPOSAL  ${fromId} → negotiate  (Δv ${dv !== undefined ? dv.toFixed(3) : '—'} km/s)`, 'proposal');
         break;
       }
       case 'maneuver_committed': {
         const objId = d['obj_id'] as string;
         clearProposal();
         addManeuverArrow(objId, d['dv_vector'] as Vec3);
-        log(ev.t, `BURN  ${objId}  —  Δv ${(d['est_dv_cost'] as number).toFixed(3)} km/s`, 'maneuver');
+        const dvMs = (d['est_dv_cost'] as number) * 1000;
+        log(ev.t, `BURN  ${objId}  —  Δv ${dvMs.toFixed(1)} m/s`, 'maneuver');
+        enqueueCaption(`BURN — ${objId.toUpperCase()}`, `Δv ${dvMs.toFixed(1)} m/s, verified by the physics referee`, '#ffa060');
         break;
       }
       case 'resolved': {
@@ -584,7 +609,9 @@ function processForwardEvents(evts: TLEvent[], fromT: number, toT: number) {
         activeConjs = [];
         clearAllConj(); clearProposal(); clearAllArrows();
         showResolvedLabels();
-        log(ev.t, `ALL CLEAR  —  total Δv ${(d['total_dv_km_s'] as number).toFixed(3)} km/s`, 'safe');
+        const totMs = (d['total_dv_km_s'] as number) * 1000;
+        log(ev.t, `ALL CLEAR  —  total Δv ${totMs.toFixed(1)} m/s`, 'safe');
+        enqueueCaption('ALL CLEAR', `negotiated peer-to-peer, physics-verified — ${totMs.toFixed(1)} m/s of fuel total`, '#3ddc97');
         if (tl) setTimeout(() => showOutcomeCard(tl!), 1400);
         break;
       }
@@ -600,7 +627,11 @@ function rebuildState(evts: TLEvent[], upToT: number) {
   clearAllConj(); clearProposal(); clearAllArrows(); clearResolvedLabels();
   eventLog.innerHTML = '';
   outcomeCard.classList.remove('visible');
-  processForwardEvents(evts, tMin - 1e-6, upToT);
+  resetComms();
+  resetCaptions();
+  suppressCaptions = true; // a scrub is not a story beat
+  processForwardEvents(evts, tMin - 1e-3, upToT);
+  suppressCaptions = false;
 }
 
 // ── Satellite color ───────────────────────────────────────────────────────────
@@ -650,6 +681,151 @@ function log(t: number, msg: string, cls: string) {
   eventLog.scrollTop = eventLog.scrollHeight;
 }
 
+// ── Comms channel — the negotiation, in the agents' own words ────────────────
+const SAT_CHAT_COLORS = ['#58c7ff', '#ffb03a', '#c792ea', '#3ddc97', '#ff8fa3', '#9fb4c7'];
+const chatColors = new Map<string, string>();
+function satChatColor(id: string): string {
+  if (!chatColors.has(id)) chatColors.set(id, SAT_CHAT_COLORS[chatColors.size % SAT_CHAT_COLORS.length]);
+  return chatColors.get(id)!;
+}
+
+const chatSides = new Map<string, 'left' | 'right'>();
+let lastBubble: { from: string; badge: string; el: HTMLElement; rounds: number } | null = null;
+let bubbleBatch = 0; // bubbles added in the current forward pass (staggers entry)
+
+function commsBadge(d: Record<string, unknown>): { label: string; cls: string } {
+  if (d['cannot_maneuver']) return { label: 'CANNOT MANEUVER', cls: 'k-cannot' };
+  if (d['assert_row'])      return { label: 'ASSERTS RIGHT-OF-WAY', cls: 'k-assert' };
+  if (d['concede_row'])     return { label: 'CONCEDES — TAKES THE BURN', cls: 'k-concede' };
+  if (d['kind'] === 'propose') {
+    const dv = d['est_dv_cost'] as number | undefined;
+    return { label: `PROPOSES BURN${dv ? `  ${(dv * 1000).toFixed(1)} m/s` : ''}`, cls: 'k-propose' };
+  }
+  if (d['kind'] === 'accept')  return { label: 'ACCEPTS', cls: 'k-accept' };
+  if (d['directive'])          return { label: 'DIRECTIVE', cls: 'k-directive' };
+  return { label: String(d['kind'] ?? 'MSG').toUpperCase(), cls: 'k-directive' };
+}
+
+function addComms(d: Record<string, unknown>) {
+  const from = String(d['from_id'] ?? '?');
+  const to = String(d['to_id'] ?? '?');
+  const { label, cls } = commsBadge(d);
+  const rationale = (d['rationale'] as string | undefined) ?? '';
+
+  // Consecutive repeats from the same sender with the same intent are one
+  // beat, re-sent across negotiation rounds — collapse them into a counter.
+  if (lastBubble && lastBubble.from === from && lastBubble.badge === label) {
+    lastBubble.rounds += 1;
+    let tag = lastBubble.el.querySelector<HTMLElement>('.comms-rounds');
+    if (!tag) {
+      tag = document.createElement('div');
+      tag.className = 'comms-rounds';
+      lastBubble.el.appendChild(tag);
+    }
+    tag.textContent = `REPEATED OVER ${lastBubble.rounds} ROUNDS`;
+    return;
+  }
+
+  if (!chatSides.has(from)) chatSides.set(from, chatSides.size % 2 ? 'right' : 'left');
+
+  const el = document.createElement('div');
+  el.className = `comms-bubble ${chatSides.get(from)}`;
+  el.style.setProperty('--sat-color', satChatColor(from));
+  el.style.animationDelay = `${Math.min(bubbleBatch * 0.14, 0.7)}s`;
+  bubbleBatch += 1;
+
+  const route = document.createElement('div');
+  route.className = 'comms-route';
+  const fromEl = document.createElement('span');
+  fromEl.className = 'comms-from';
+  fromEl.textContent = from.toUpperCase();
+  const toEl = document.createElement('span');
+  toEl.className = 'comms-to';
+  toEl.textContent = `→ ${to.toUpperCase()}`;
+  const kindEl = document.createElement('span');
+  kindEl.className = `comms-kind ${cls}`;
+  kindEl.textContent = label;
+  route.append(fromEl, toEl, kindEl);
+  el.appendChild(route);
+
+  if (rationale) {
+    const text = document.createElement('div');
+    text.className = 'comms-text';
+    text.textContent = rationale;
+    el.appendChild(text);
+  }
+
+  eventLog.appendChild(el);
+  eventLog.scrollTop = eventLog.scrollHeight;
+  lastBubble = { from, badge: label, el, rounds: 1 };
+}
+
+function resetComms() {
+  lastBubble = null;
+  bubbleBatch = 0;
+  // keep chatColors/chatSides stable across replays so identities don't shift
+}
+
+// ── Story captions — cinematic lower-third narration ─────────────────────────
+const captionEl = document.getElementById('caption')!;
+const captionHead = document.getElementById('caption-headline')!;
+const captionSub = document.getElementById('caption-sub')!;
+const capQueue: { head: string; sub: string; color: string; sticky?: boolean }[] = [];
+let capTimer: ReturnType<typeof setTimeout> | null = null;
+let capActive = false;
+let capSticky = false; // current caption stays until dismissed (the play invite)
+let suppressCaptions = false; // true while rebuilding state for a scrub
+
+let lastCapHead = '';
+function enqueueCaption(head: string, sub: string, color: string, sticky = false) {
+  if (suppressCaptions) return;
+  if (head === lastCapHead) return; // a re-sent beat is one caption, not two
+  lastCapHead = head;
+  capQueue.push({ head, sub, color, sticky });
+  pumpCaptions();
+}
+
+function pumpCaptions() {
+  if (capActive) return;
+  const c = capQueue.shift();
+  if (!c) return;
+  capActive = true;
+  capSticky = !!c.sticky;
+  captionEl.style.setProperty('--cap-color', c.color);
+  captionEl.style.setProperty('--cap-glow', `${c.color}66`);
+  captionHead.textContent = c.head;
+  captionSub.textContent = c.sub;
+  captionEl.classList.add('visible');
+  if (!c.sticky) {
+    capTimer = setTimeout(() => {
+      captionEl.classList.remove('visible');
+      capTimer = setTimeout(() => { capActive = false; pumpCaptions(); }, 450);
+    }, 3400);
+  }
+}
+
+function dismissStickyCaption() {
+  if (!capActive || !capSticky) return;
+  capSticky = false;
+  captionEl.classList.remove('visible');
+  capTimer = setTimeout(() => { capActive = false; pumpCaptions(); }, 450);
+}
+
+function resetCaptions() {
+  capQueue.length = 0;
+  if (capTimer) clearTimeout(capTimer);
+  capTimer = null;
+  capActive = false;
+  lastCapHead = '';
+  captionEl.classList.remove('visible');
+}
+
+function firstSentence(s: string, max = 130): string {
+  const stop = s.indexOf('. ');
+  const cut = stop > 20 && stop < max ? s.slice(0, stop + 1) : s.slice(0, max);
+  return cut.length < s.length && !cut.endsWith('.') ? `${cut.trimEnd()}…` : cut;
+}
+
 // ── Event markers on scrubber ─────────────────────────────────────────────────
 const EVT_MARK_CLASS: Record<string, string> = {
   conjunction_detected: 'danger',
@@ -664,9 +840,10 @@ function updateEventMarkers(evts: TLEvent[], tMin: number, tMax: number) {
   const range = tMax - tMin;
   if (range <= 0) return;
   evts.forEach(ev => {
+    if (!(ev.type in EVT_MARK_CLASS)) return; // comms are too dense to mark
     const frac = (ev.t - tMin) / range;
     const mark = document.createElement('div');
-    mark.className = `ev-mark ${EVT_MARK_CLASS[ev.type] ?? 'info'}`;
+    mark.className = `ev-mark ${EVT_MARK_CLASS[ev.type]}`;
     // Account for thumb half-width (~7px) so mark aligns with thumb position
     mark.style.left = `calc(7px + ${(frac * 100).toFixed(3)}% - ${(frac * 14).toFixed(3)}px)`;
     mark.title = `T+${ev.t}s: ${ev.type}`;
@@ -679,7 +856,7 @@ let tl: Timeline | null = null;
 let tMin = 0, tMax = 1;
 let playTime = 0;
 let playing  = false;
-let speed    = 10;
+let speed    = 30;
 let trailTick = 0;
 
 function loadTimeline(data: Timeline) {
@@ -707,11 +884,22 @@ function loadTimeline(data: Timeline) {
   updatePhaseBadge();
   updateEventMarkers(data.events, tMin, tMax);
 
-  subtitleEl.textContent = (data.meta['scenario'] as string | undefined) ?? 'Unnamed scenario';
+  resetComms();
+  resetCaptions();
   log(tMin, `Loaded — ${ids.length} objects, ${data.events.length} events`, 'info');
-  // Events at exactly t=tMin (the opening conjunction + first proposals) would
-  // otherwise never render: playback's forward pass uses an exclusive lower bound.
-  processForwardEvents(data.events, tMin - 1e-6, tMin);
+  // Start a hair before tMin so events at exactly t=tMin (the opening
+  // conjunction + first messages) unfold ON PLAY — the story starts live.
+  playTime = tMin - 1e-3;
+  const firstConj = data.events.find(e => e.type === 'conjunction_detected');
+  if (firstConj) {
+    const cd = firstConj.data;
+    enqueueCaption(
+      'TWO SATELLITES, ONE COLLISION COURSE',
+      `${cd['a_id']} / ${cd['b_id']} — press ▶ to watch them negotiate their way out`,
+      '#58c7ff',
+      true,
+    );
+  }
 
   // Update sim toggle count badge
   const simBtn = document.getElementById('sim-toggle');
@@ -828,8 +1016,9 @@ outcomeCard.addEventListener('click', e => {
 function updatePlayBtn() { playBtn.textContent = playing ? '⏸' : '▶'; }
 
 function updateTimeDsp() {
-  const mins = Math.floor(playTime / 60);
-  const secs = Math.floor(playTime % 60);
+  const shown = Math.max(playTime, tMin);
+  const mins = Math.floor(shown / 60);
+  const secs = Math.floor(shown % 60);
   timeDsp.textContent = `T+${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
 }
 
@@ -837,11 +1026,12 @@ function updateTimeDsp() {
 playBtn.addEventListener('click', () => {
   if (!tl) return;
   if (!playing && playTime >= tMax) {
-    playTime = tMin;
-    rebuildState(tl.events, tMin);
+    playTime = tMin - 1e-3; // replay the whole story, t=tMin beats included
+    rebuildState(tl.events, playTime);
     scrubber.value = '0';
   }
   playing = !playing;
+  if (playing) dismissStickyCaption();
   updatePlayBtn();
 });
 
@@ -855,7 +1045,10 @@ scrubber.addEventListener('input', () => {
   if (newT < playTime) {
     rebuildState(tl.events, newT);
   } else {
+    suppressCaptions = true; // a scrub is not a story beat
     processForwardEvents(tl.events, playTime, newT);
+    suppressCaptions = false;
+    resetCaptions(); // drop any caption that was mid-flight
   }
   playTime = newT;
 

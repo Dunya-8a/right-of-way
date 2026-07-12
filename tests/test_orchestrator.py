@@ -112,6 +112,11 @@ def test_emitted_timeline_is_dropin_for_viz():
     # proposal events carry recipient_id
     props = [e for e in tl.events if e.type == "proposal" and "proposer_id" in e.data]
     assert props and all("recipient_id" in e.data for e in props)
+    # every negotiation message is on the timeline as a comms event (the viz
+    # renders these as the A2A channel — the agents' own words)
+    comms = [e for e in tl.events if e.type == "comms"]
+    assert comms and all("from_id" in e.data and "kind" in e.data for e in comms)
+    assert any(e.data.get("rationale") for e in comms)
     assert tl.meta["frame"] == "ECI"
 
 

@@ -120,6 +120,7 @@ TimelineEventType = Literal[
     "maneuver_committed",
     "resolved",
     "new_conjunction",
+    "comms",  # one negotiation message (any kind) — the agents' own words
 ]
 
 
