@@ -31,19 +31,19 @@ sat_A → sat_B   Right-of-way says I should give way to you — but my Δv budg
 sat_B → sat_A   I hold right-of-way (priority 9 vs your 1). Requesting you give way.
 sat_B → sat_A   Understood — you have no fuel and can't move. Right-of-way is moot
                 against a sat that physically can't yield. I'll trade and take the burn.
-sat_B → sat_A   PROPOSE burn (0, +8.5, −8.5) m/s @ t+240s
+sat_B → sat_A   PROPOSE burn (+13.8, 0, −2.8) m/s @ t+420s
 sat_A → sat_B   Your burn clears our conjunction. Accepted.
 ```
 
 The trade **emerges from the conversation** — a test proves that giving `sat_A` fuel flips who moves, so it's negotiation, not an `if`-statement. Then `sat_B`'s dodge nearly clips a *third* satellite, the physics referee catches it, and they renegotiate. Here's a full run (`python -m row.orchestrator`):
 
 ```
-topology=hierarchical  converged=True  iterations=2  total_dv=20.0 m/s  rounds=2
+topology=hierarchical  converged=True  iterations=2  total_dv=31.4 m/s  rounds=2
   t=    0.0  conjunction_detected   sat_A / sat_B   (miss 3.0 km)
-  t=  240.0  maneuver_committed     sat_B  Δv 0.010 km/s
-  t=  240.0  new_conjunction        sat_B / sat_C   (miss 1.5 km)   ← the fix created a new risk
-  t=  335.8  maneuver_committed     sat_C  Δv 0.010 km/s
-  t=  879.6  resolved                                               ← provably clear
+  t=  420.0  maneuver_committed     sat_B  Δv 14.1 m/s
+  t=  420.0  new_conjunction        sat_B / sat_C   (miss 0.4 km)   ← the fix created a new risk
+  t=  430.0  maneuver_committed     sat_C  Δv 17.4 m/s
+  t=  897.1  resolved                                               ← provably clear
 ```
 
 ![The live 3D view — the forced-trade constellation over a real NASA Earth (Blue Marble + live GIBS tiles); green when the orbit is provably clear](docs/images/all-clear.png)
@@ -111,6 +111,10 @@ web/                        # three.js + Vite 3D orbit viz (real NASA Blue Marbl
 - **W&B Weave** — traces the full multi-agent run (every `negotiate()`, every physics `screen_conjunctions` / `apply_maneuver`, every repair iteration) so an opaque agent loop becomes a transcript you can read and evaluate. The verifier-first principle becomes *visible*: each candidate burn an agent proposes is a physics call nested under its negotiation, and an over-budget burn surfaces as a referee `ValueError` right in the trace. A Weave **evaluation + leaderboard** scores `swarm` vs `hierarchical` × `MockBrain` vs `ClaudeBrain` on six metrics (conjunctions resolved, new conjunctions created, total Δv, rounds-to-converge, iterations, and a budget guardrail). Instrumentation is **additive** — a thin `row/eval/` wrapper around the seams the loop already exposes, touching neither the contracts nor the run loop. See [`row/eval/`](row/eval/) (`uv run python -m row.eval --leaderboard`).
 - **Anthropic Claude (Sonnet 4.6)** — the reasoning core of each satellite-agent (tool-use + prompt caching, with a deterministic offline fallback so the demo never breaks). Claude Code was also the *build* harness: parallel agent sessions, one per workstream, each in its own worktree.
 - **MCP** — the physics referee as a real FastMCP tool server, the thing that keeps the LLM-agents honest.
+
+## License
+
+[MIT](LICENSE).
 
 ---
 
