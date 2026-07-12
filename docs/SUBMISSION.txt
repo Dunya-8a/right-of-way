@@ -1,0 +1,56 @@
+RIGHT OF WAY — AGI House submission (plaintext, paste straight into the form)
+
+
+PROJECT NAME
+Right of Way
+
+
+TAGLINE
+Agentic air-traffic control for space — we gave satellites a group chat to keep them from crashing into each other.
+
+
+DESCRIPTION
+We gave satellites a group chat. When two satellites from different operators drift onto a collision course, there's no mission control to settle it — each one only knows its own fuel, its own mission, and wants the OTHER one to move. Right of Way turns them into AI agents that negotiate their own avoidance maneuvers in plain English — peer-to-peer, no central planner — while a deterministic physics engine referees every deal and catches the moment one satellite's dodge creates the NEXT near-miss. Kessler syndrome, handled by conversation.
+
+WHY IT'S NOT JUST A PHYSICS SIM. Computing one satellite's avoidance burn is solved math — we keep the LLM out of it. The hard part is the negotiation between operators who share no central authority, no common objective, and won't take each other's math on faith. One satellite's dodge can shove it into a third's path. That's not a computation; it's a negotiation under partial information with conflicting goals — exactly what multi-agent systems are for. The same mechanism fits any fleet with no central boss: drones (the FAA's decentralized UTM / Part 108 framework, ~2026), self-driving cars, autonomous ships.
+
+THE PROOF THE AGENTS ARE REAL. The naive rule is "lowest-priority satellite yields." So we broke it: the lowest-priority satellite is out of fuel and physically can't move, forcing the higher-priority one to give up right-of-way and dodge anyway. Nobody hard-codes this — sat_A says "I can't move, requesting a trade," and sat_B concedes ("right-of-way is moot against a sat that physically can't yield — I'll take the burn"). The trade EMERGES from the conversation (a test proves that giving sat_A fuel flips who moves — negotiation, not an if-statement). Then sat_B's dodge nearly clips a third satellite, the physics referee catches it, and they renegotiate until the orbit is provably clear.
+
+HOW IT'S BUILT
+- A2A: agents negotiate by passing propose / counter / accept / yield messages; the bus just routes, the agents decide who moves.
+- MCP: the physics referee is a real FastMCP server exposing propagate / screen_conjunctions / apply_maneuver as agent-callable tools — agents call ground-truth orbital mechanics instead of guessing.
+- Two topologies, one flag: emergent peer-to-peer swarm OR hierarchical coordinator; swarm stalls -> fall back -> safe no-op, so the demo can't hard-fail.
+- Verifier-first: LLM-agents reason about intent / priority / strategy; the deterministic core (exact two-body propagation, conjunction screening, fuel accounting) owns feasibility and re-screens every committed burn.
+- Stack: Python + NumPy physics core, Claude (Sonnet 4.6) agent brains with a deterministic offline fallback, pydantic v2 contracts, three.js + Vite 3D viz over a real NASA Earth. Built by orchestrating parallel Claude Code agent sessions, one per workstream, in separate git worktrees — a multi-agent build for a multi-agent product.
+
+SPONSOR TOOLS
+- W&B Weave: traces the full run (every negotiate(), every MCP physics call, every repair loop) — the opaque multi-agent loop becomes a transcript you can read.
+- Anthropic Claude (Sonnet 4.6): the reasoning core of each satellite-agent, and the dev harness via Claude Code.
+- MCP: the physics referee as a real FastMCP tool server, the thing that keeps the agents honest.
+
+
+TECH STACK (comma-separated)
+Python, pydantic v2, Claude (Anthropic API), MCP (FastMCP), A2A negotiation, NumPy two-body orbital mechanics, W&B Weave, three.js, Vite, TypeScript, Claude Code (parallel git worktrees)
+
+
+TRACK
+General Track
+
+
+REPOSITORY URL
+https://github.com/Dunya-8a/right-of-way
+
+
+DEMO URL
+<deployed viz url, or the demo video link>
+
+
+TEAM MEMBERS
+<your @handle> (solo build)
+
+
+----------------------------------------------------------------------
+ALTERNATE TAGLINES (swap in if you want a different vibe)
+- Air-traffic control for space, run by the satellites themselves.
+- There's no mission control in orbit. So the satellites negotiate it out.
+- Kessler syndrome, handled by conversation.

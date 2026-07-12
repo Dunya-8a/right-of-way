@@ -23,3 +23,6 @@ web/public/timeline.json
 
 # Playwright (per house rules)
 .playwright-mcp/
+
+# Claude Code local session state
+.claude/
