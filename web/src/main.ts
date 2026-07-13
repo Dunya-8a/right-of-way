@@ -1352,6 +1352,24 @@ scrubber.addEventListener('input', () => {
 
 speedSel.addEventListener('change', () => { speed = parseFloat(speedSel.value); });
 
+// ── "How it works" overlay ────────────────────────────────────────────────────
+{
+  const card = document.getElementById('info-card')!;
+  const open = () => card.classList.add('visible');
+  const close = () => {
+    card.classList.remove('visible');
+    try { localStorage.setItem('row-intro-seen', '1'); } catch { /* private mode */ }
+  };
+  document.getElementById('info-btn')?.addEventListener('click', open);
+  document.getElementById('info-dismiss')?.addEventListener('click', close);
+  card.addEventListener('click', e => { if (e.target === card) close(); });
+  // First visit: explain before playing. Never in recording/autoplay modes.
+  let seen = false;
+  try { seen = !!localStorage.getItem('row-intro-seen'); } catch { seen = true; }
+  const p = new URLSearchParams(location.search);
+  if (!seen && !p.has('clean') && !p.has('autoplay')) open();
+}
+
 const storyBtn = document.getElementById('story-btn');
 storyBtn?.addEventListener('click', () => {
   guided = !guided;

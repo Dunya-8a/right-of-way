@@ -36,10 +36,73 @@
       font-size: 12px; letter-spacing: 0.15em;
       color: rgba(0,212,255,0.5); margin-top: 4px;
     }
+    #header-right {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+      pointer-events: all;
+    }
+    #info-btn {
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.5);
+      color: #7adfff; padding: 7px 14px;
+      font-family: inherit; font-size: 12.5px; letter-spacing: 0.12em;
+      cursor: pointer; border-radius: 4px;
+      transition: background 0.15s;
+    }
+    #info-btn:hover { background: rgba(0,212,255,0.18); }
     #drop-hint {
       font-size: 11px; letter-spacing: 0.12em;
-      color: rgba(255,255,255,0.28); align-self: center;
+      color: rgba(255,255,255,0.28);
     }
+
+    /* ── "How it works" overlay ──────────────────────────────────────────── */
+    #info-card {
+      position: absolute; inset: 0;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(5,5,16,0.8);
+      z-index: 200;
+    }
+    #info-card.visible { display: flex; }
+    #info-inner {
+      background: rgba(7,14,26,0.98);
+      border: 1px solid rgba(0,212,255,0.35);
+      border-radius: 8px;
+      width: min(720px, 92vw);
+      max-height: 86vh; overflow-y: auto;
+      padding: 30px 38px 26px;
+      font-size: 14px; line-height: 1.65;
+      color: rgba(228,240,250,0.92);
+    }
+    #info-inner::-webkit-scrollbar { width: 5px; }
+    #info-inner::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.3); border-radius: 3px; }
+    #info-inner h1 {
+      font-size: 19px; letter-spacing: 0.22em; color: #00d4ff;
+      margin-bottom: 4px;
+    }
+    #info-inner h2 {
+      font-size: 13px; letter-spacing: 0.2em; color: #7adfff;
+      margin: 22px 0 8px;
+      border-bottom: 1px solid rgba(0,212,255,0.18);
+      padding-bottom: 5px;
+    }
+    #info-inner p { margin-bottom: 10px; }
+    #info-inner em { color: #ffcc66; font-style: normal; }
+    #info-inner strong { color: #fff; }
+    #info-inner a { color: #7adfff; }
+    #info-tagline {
+      font-size: 12px; letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.45); margin-bottom: 6px;
+    }
+    #info-dismiss {
+      display: block; margin: 22px auto 0;
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.6);
+      color: #7adfff;
+      font-family: inherit; font-size: 13px; letter-spacing: 0.15em;
+      padding: 10px 34px; cursor: pointer; border-radius: 4px;
+      transition: background 0.15s;
+    }
+    #info-dismiss:hover { background: rgba(0,212,255,0.22); }
+    body.clean #info-btn { display: none; }
 
     /* ── Phase badge ─────────────────────────────────────────────────────── */
     #phase-badge {
@@ -476,7 +539,7 @@
       white-space: nowrap; pointer-events: none;
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-II-nR6k-.js"></script>
+  <script type="module" crossorigin src="/assets/index-C-biotvo.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -521,7 +584,10 @@
       <div id="title">RIGHT OF WAY</div>
       <div id="subtitle">An agent-to-agent right-of-way protocol for physical swarms — demoed in orbit</div>
     </div>
-    <div id="drop-hint">DROP TIMELINE JSON TO REPLACE FIXTURE</div>
+    <div id="header-right">
+      <button id="info-btn" title="What am I looking at?">ⓘ HOW IT WORKS</button>
+      <div id="drop-hint">DROP TIMELINE JSON TO REPLACE FIXTURE</div>
+    </div>
   </div>
 
   <div id="phase-badge">
@@ -546,6 +612,69 @@
   <div id="caption">
     <div id="caption-headline"></div>
     <div id="caption-sub"></div>
+  </div>
+
+  <div id="info-card">
+    <div id="info-inner">
+      <h1>RIGHT OF WAY</h1>
+      <div id="info-tagline">An agent-to-agent right-of-way protocol for physical swarms — demoed in orbit</div>
+
+      <h2>WHAT YOU'RE WATCHING</h2>
+      <p>Two satellites are predicted to pass dangerously close. There is no air-traffic
+      control in space — in real life, operators coordinate close approaches by <em>email</em>
+      (in 2019, SpaceX missed ESA's messages because of a paging bug). Here, each satellite
+      has an AI agent. They negotiate <strong>who moves</strong>, in plain English, over the
+      channel on the right — and a deterministic physics engine referees every deal.</p>
+
+      <h2>WAIT — SATELLITES HAVE FUEL?</h2>
+      <p>Yes. Most satellites carry a small tank of propellant for tiny thrusters. Firing
+      them is called a <em>burn</em>. The lifetime supply is measured as
+      <em>Δv (delta-v)</em> — the total change in velocity, in meters per second, the tank
+      can still produce. A typical dodge costs 0.01–0.05% of orbital speed; this demo's
+      burns are 10–45 m/s.</p>
+      <p><strong>Why it matters:</strong> fuel is mission lifetime. Every dodge you make is
+      months of operational life you don't get back — which is exactly why nobody
+      <em>wants</em> to be the one who moves, and why this is a negotiation, not a
+      calculation. When the tank hits zero (or the satellite is dead, like a defunct
+      nanosat), it physically cannot move — someone else must.</p>
+
+      <h2>WHO HAS RIGHT OF WAY?</h2>
+      <p>Honest answer: <strong>there is no agreed standard</strong> — that's the gap this
+      project pokes at. The demo models a right-of-way policy as a <em>priority number</em>
+      (higher outranks lower — think crewed spacecraft &gt; science missions &gt;
+      mega-constellation sat #4,412 &gt; debris). The norm says the lower-priority party
+      dodges. The interesting moments are when the norm <em>can't</em> hold: the
+      lower-priority satellite is out of fuel, or its operator won't answer — and the agents
+      have to talk their way to who burns instead.</p>
+
+      <h2>THE PHYSICS REFEREE</h2>
+      <p>The agents can argue, bargain — even lie. It doesn't matter: no agreement counts
+      until a deterministic orbital-mechanics engine confirms the proposed burn actually
+      clears the encounter and fits the mover's fuel budget. After every burn it re-scans
+      the sky — if the dodge created a <em>new</em> close approach, the agents are thrown
+      back to the table. And claims get audited: say "I can't move" while the referee's
+      ground truth shows a full tank, and the deal is voided and the burn lands on
+      <em>you</em>. The judge is physics, not vibes.</p>
+
+      <h2>READING THE SCREEN</h2>
+      <p><span style="color:#ff5555">Red dots + line</span> = the two objects at risk and
+      their predicted close pass, labeled with how near they'll get.
+      <span style="color:#ffaa00">Orange arrow</span> = the committed dodge burn and its
+      direction. <span style="color:#00ff88">Green</span> = passed safely / all clear.
+      ▶ plays the recorded run; <em>STORY</em> pauses the orbits while each message plays
+      at reading pace. Try the other bundled runs:
+      <a href="?timeline=liar">the lying satellite</a> ·
+      <a href="?timeline=live">a real conjunction from this week</a> ·
+      <a href="?timeline=forced-trade">the synthetic proof</a>.</p>
+
+      <p style="margin-top:14px">Open source (MIT):
+      <a href="https://github.com/Dunya-8a/right-of-way" target="_blank" rel="noopener">github.com/Dunya-8a/right-of-way</a>
+      — the negotiation mechanism is specified domain-independently in
+      <a href="https://github.com/Dunya-8a/right-of-way/blob/main/PROTOCOL.md" target="_blank" rel="noopener">PROTOCOL.md</a>
+      (same loop works for drones, ships, any fleet with no central boss).</p>
+
+      <button id="info-dismiss">GOT IT — PRESS ▶ TO WATCH</button>
+    </div>
   </div>
 
   <div id="legend">

@@ -105,7 +105,9 @@ uv run python -m row.eval --leaderboard      # swarm/hierarchical × mock/claude
 cd web && pnpm install && pnpm dev       # the 3D viz — plays the emitted Timeline in story mode
 ```
 
-The viz opens on the Aeolus re-enactment and narrates it: **story mode** freezes the orbital clock at each negotiation, plays the messages beat-by-beat, and shows the referee verifying every burn. URL params: `?timeline=forced-trade` / `?timeline=liar` / `?timeline=live` (the bundled runs), `?autoplay`, `?clean` (hide the chrome — for recording clips).
+The viz opens on the Aeolus re-enactment and narrates it: **story mode** freezes the orbital clock at each negotiation, plays the messages beat-by-beat, and shows the referee verifying every burn. First-time visitors get a "HOW IT WORKS" explainer (what Δv/fuel is, how right-of-way is modeled, what the referee checks). URL params: `?timeline=forced-trade` / `?timeline=liar` / `?timeline=live` (the bundled runs), `?autoplay`, `?clean` (hide the chrome — for recording clips).
+
+The viz is a static site — `vercel.json` at the repo root deploys it as-is (import the repo on Vercel, or `npx vercel`); every push to `main` redeploys.
 
 > **Honesty note on the re-enactment:** it reconstructs the documented *encounter geometry* (320 km, crossing planes, sub-km predicted miss, TCA 2019-09-02 ~11:02 UTC) under two-body dynamics — it is not archival TLE propagation. Starlink-44 could physically maneuver in 2019; SpaceX declined / was unreachable, and we model "will not / cannot coordinate a burn" as a ~zero maneuver budget while the agent's prompt carries the real operational story. See `row/scenario_real.py`.
 
