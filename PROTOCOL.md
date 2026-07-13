@@ -120,6 +120,22 @@ Truthful incapacity (ground truth agrees) passes untouched. See
 `--scenario liar` for the reference demonstration and
 `test_liar_is_audited_and_reassigned` for the normative behavior.
 
+**Where does the referee's ground truth come from?** In the reference
+implementation, trivially: the referee *is* the simulated world. In
+deployment it splits by claim type. Trajectories and maneuvers are
+independently observable — radar/optical tracking networks measure where
+every object actually is without its operator's cooperation, so "does this
+action clear the conflict" and "did the committed action occur" rest on
+third-party-verifiable data today. Capability claims (fuel, health) are not
+directly observable; a deployed referee audits them by inference (maneuver
+history — an object that station-kept last week cannot be dead this week),
+by ex-post falsification (claim incapacity, then get observed maneuvering →
+the claim is provably false, with reputation/liability consequences), and by
+attestation requirements at on-boarding. The protocol's guarantee is scoped
+accordingly: claims are auditable against whatever ground truth the referee
+holds, and the referee should hold the strongest independently-sourced world
+model the domain permits.
+
 ## 8. The record
 
 An episode emits a self-contained, replayable `Timeline`: world frames, every

@@ -121,24 +121,19 @@ Starlink concedes (the dead sat physically can't move) and burns 45 m/s.
 6. Screenshot stills for the thread: scrub to mid-negotiation (the comms
    panel full), and the RESOLVED card.
 
-## Earlier drafts (preserved)
+## Earlier drafts (preserved verbatim — the originals, liked as-is)
 
-**Short single-tweet (pre-Aeolus, from this session's first pass):**
+**Short:**
 
-> There's no air-traffic control in space. So we gave satellites a group
-> chat. 🛰️ When two sats drift onto a collision course, AI agents negotiate
-> who dodges — peer-to-peer, no one in charge — while a physics engine
-> referees every deal. When the dodge creates a *new* near-miss, they go
-> back to the table. Built at a 1-day hackathon. Open source:
-> github.com/Dunya-8a/right-of-way
+> There's no air-traffic control in space. So we gave satellites a group chat. 🛰️
+>
+> When two sats drift onto a collision course, AI agents negotiate who dodges — peer-to-peer, no one in charge — while a physics engine referees every deal. When the dodge creates a *new* near-miss, they go back to the table.
+>
+> Built at a 1-day hackathon. Open source: github.com/Dunya-8a/right-of-way
 
-**Thread opener with the forced-trade twist (pre-Aeolus):**
+**Thread opener with the twist:**
 
-> The rule in orbit is "lowest priority yields." So we broke it: the
-> low-priority sat is out of fuel and physically can't move. Nobody
-> hard-coded what happens next — sat_A says "I can't move," and sat_B
-> *concedes right-of-way and takes the burn*. A test proves giving sat_A
-> fuel flips who moves. Negotiation, not an if-statement.
+> The rule in orbit is "lowest priority yields." So we broke it: the low-priority sat is out of fuel and physically can't move. Nobody hard-coded what happens next — sat_A says "I can't move," and sat_B *concedes right-of-way and takes the burn*. A test proves giving sat_A fuel flips who moves. Negotiation, not an if-statement.
 
 **Hackathon submission tagline (docs/SUBMISSION.md):**
 
