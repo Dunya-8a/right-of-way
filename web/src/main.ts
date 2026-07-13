@@ -187,7 +187,7 @@ camera.position.set(0, 0.7, 3.2);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
-controls.minDistance = 1.15;
+controls.minDistance = 0.05; // allow close framing of a conjunction pair
 controls.maxDistance = 20;
 
 // Lights
@@ -492,19 +492,59 @@ function updateProposal(wallMs: number) {
 // Maneuver arrows
 const manArrows = new Map<string, THREE.ArrowHelper>();
 
-function addManeuverArrow(objId: string, dv: Vec3) {
+// Plain-language description of a burn: which way it pushes, in orbit terms.
+// dv is km/s ECI; the frame axes come from the object's state near burn time.
+function describeBurn(objId: string, dv: Vec3, t: number): string {
+  const dvMs = Math.hypot(...dv) * 1000;
+  const head = `▲ ${dvMs.toFixed(1)} m/s`;
+  if (!tl) return head;
+  // nearest recorded frame to the burn
+  let best = tl.frames[0];
+  for (const f of tl.frames) if (Math.abs(f.t - t) < Math.abs(best.t - t)) best = f;
+  const o = best.objects.find(x => x.id === objId);
+  if (!o || !o.v) return head;
+  const r = new THREE.Vector3(...o.r).normalize();     // radial: away from Earth
+  const v = new THREE.Vector3(...o.v).normalize();     // along-track: direction of travel
+  const c = r.clone().cross(v).normalize();            // cross-track: out of plane
+  const d = new THREE.Vector3(...dv);
+  const comps: [number, string][] = [
+    [d.dot(r), d.dot(r) > 0 ? 'pushes outward — climbs over the threat' : 'pushes inward — dips under the threat'],
+    [d.dot(v), d.dot(v) > 0 ? 'speeds up — raises its orbit' : 'slows down — lowers its orbit'],
+    [d.dot(c), 'thrusts sideways — shifts its orbital plane'],
+  ];
+  comps.sort((x, y) => Math.abs(y[0]) - Math.abs(x[0]));
+  return `${head} · ${comps[0][1]}`;
+}
+
+function addManeuverArrow(objId: string, dv: Vec3, labelText?: string) {
   removeManeuverArrow(objId);
   const dir = new THREE.Vector3(...dv);
   if (dir.lengthSq() < 1e-12) return;
   dir.normalize();
   const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(), 0.16, COL.PROPOSAL, 0.03, 0.014);
+  if (labelText) {
+    const div = document.createElement('div');
+    div.className = 'burn-label';
+    div.textContent = labelText;
+    const lab = new CSS2DObject(div);
+    lab.position.copy(dir.clone().multiplyScalar(0.19)); // just past the arrow tip
+    arrow.add(lab);
+  }
   const sat = sats.get(objId);
   if (sat) { arrow.position.copy(sat.mesh.position); scene.add(arrow); manArrows.set(objId, arrow); }
 }
 
 function removeManeuverArrow(id: string) {
   const a = manArrows.get(id);
-  if (a) { scene.remove(a); manArrows.delete(id); }
+  if (a) {
+    // CSS2D label elements outlive scene.remove — detach their DOM explicitly.
+    a.traverse(o => {
+      const el = (o as unknown as { isCSS2DObject?: boolean; element?: HTMLElement });
+      if (el.isCSS2DObject && el.element) el.element.remove();
+    });
+    scene.remove(a);
+    manArrows.delete(id);
+  }
 }
 
 function clearAllArrows() { manArrows.forEach((_, id) => removeManeuverArrow(id)); }
@@ -571,6 +611,8 @@ function applyOneEvent(ev: TLEvent) {
         const miss = d['miss_distance_km'] as number;
         activeConjs = [...activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId)), { aId, bId, miss }];
         upsertConjLine(aId, bId);
+        focusPair = [aId, bId]; // camera director: frame the action
+        returnHome = false;
         episodeBubbles.clear(); // a new conjunction opens a new negotiation episode
         const prefix = ev.type === 'new_conjunction'
           ? '⚖ RE-SCREEN ✗  NEW COLLISION RISK'
@@ -624,7 +666,11 @@ function applyOneEvent(ev: TLEvent) {
       case 'maneuver_committed': {
         const objId = d['obj_id'] as string;
         clearProposal();
-        addManeuverArrow(objId, d['dv_vector'] as Vec3);
+        addManeuverArrow(
+          objId,
+          d['dv_vector'] as Vec3,
+          describeBurn(objId, d['dv_vector'] as Vec3, (d['t_burn'] as number) ?? ev.t),
+        );
         activeConjs
           .filter(c => c.aId === objId || c.bId === objId)
           .forEach(c => markConjClearing(c.aId, c.bId));
@@ -644,6 +690,8 @@ function applyOneEvent(ev: TLEvent) {
       case 'resolved': {
         isResolved = true;
         activeConjs = [];
+        focusPair = null;
+        returnHome = true; // camera director: pull back to the wide shot
         clearAllConj(); clearProposal(); clearAllArrows();
         showResolvedLabels();
         const totMs = (d['total_dv_km_s'] as number) * 1000;
@@ -729,6 +777,46 @@ function flushNarration() {
   suppressCaptions = false;
   narrationQueue = [];
   narrating = false;
+}
+
+// ── Camera director — frame the action ───────────────────────────────────────
+// On a detected collision risk the camera eases in on the pair; on resolution
+// it eases back home. Any manual drag hands control back to the user.
+const HOME_POS = new THREE.Vector3(0, 0.7, 3.2);
+const HOME_TGT = new THREE.Vector3(0, 0, 0);
+let focusPair: [string, string] | null = null;
+let returnHome = false;
+let userDrove = false;
+
+controls.addEventListener('start', () => {
+  // the human grabbed the camera — the director yields for the rest of the run
+  userDrove = true;
+  focusPair = null;
+  returnHome = false;
+});
+
+function directCamera() {
+  if (userDrove) return;
+  if (focusPair) {
+    const pa = sats.get(focusPair[0])?.mesh.position;
+    const pb = sats.get(focusPair[1])?.mesh.position;
+    if (!pa || !pb) return;
+    const mid = pa.clone().add(pb).multiplyScalar(0.5);
+    const n = mid.clone().normalize();
+    let tangent = new THREE.Vector3(0, 1, 0).cross(n);
+    if (tangent.lengthSq() < 1e-6) tangent = new THREE.Vector3(1, 0, 0);
+    tangent.normalize();
+    // A 3/4 shot: above the pair, offset sideways, Earth as the backdrop.
+    const goal = mid.clone()
+      .add(n.multiplyScalar(0.5))
+      .add(tangent.multiplyScalar(0.24));
+    camera.position.lerp(goal, 0.03);
+    controls.target.lerp(mid, 0.05);
+  } else if (returnHome) {
+    camera.position.lerp(HOME_POS, 0.025);
+    controls.target.lerp(HOME_TGT, 0.025);
+    if (camera.position.distanceTo(HOME_POS) < 0.03) returnHome = false;
+  }
 }
 
 // Full rebuild when scrubbing backwards or replaying: reset visuals AND the
@@ -1031,6 +1119,9 @@ function loadTimeline(data: Timeline) {
   resetCaptions();
   narrationQueue = [];
   narrating = false;
+  focusPair = null;
+  returnHome = false;
+  userDrove = false;
   log(tMin, `Loaded — ${ids.length} objects, ${data.events.length} events`, 'info');
   // Start a hair before tMin so events at exactly t=tMin (the opening
   // conjunction + first messages) unfold ON PLAY — the story starts live.
@@ -1141,6 +1232,7 @@ function frame() {
 
   earth.rotation.y += 0.00008;
   liveLayer.tick60(new Date());
+  directCamera();
   controls.update();
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
