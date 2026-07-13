@@ -807,11 +807,12 @@ function directCamera() {
     if (tangent.lengthSq() < 1e-6) tangent = new THREE.Vector3(1, 0, 0);
     tangent.normalize();
     // A 3/4 shot: above the pair, offset sideways, Earth as the backdrop.
+    // Deliberately slow — the approach from the wide view IS part of the show.
     const goal = mid.clone()
       .add(n.multiplyScalar(0.5))
       .add(tangent.multiplyScalar(0.24));
-    camera.position.lerp(goal, 0.03);
-    controls.target.lerp(mid, 0.05);
+    camera.position.lerp(goal, 0.016);
+    controls.target.lerp(mid, 0.035);
   } else if (returnHome) {
     camera.position.lerp(HOME_POS, 0.025);
     controls.target.lerp(HOME_TGT, 0.025);
@@ -896,6 +897,9 @@ const chatSides = new Map<string, 'left' | 'right'>();
 // One bubble per (sender, stance) per episode: negotiation rounds re-send the
 // same stances, and repeats fold into the first bubble's rounds counter.
 const episodeBubbles = new Map<string, { el: HTMLElement; rounds: number }>();
+// A concede is followed by a propose carrying the SAME rationale (one decision,
+// two protocol messages) — merge those into one bubble wearing both badges.
+let lastNewBubble: { from: string; rationale: string; el: HTMLElement } | null = null;
 let lastCommsCollapsed = false; // did the most recent addComms fold into an old bubble?
 let bubbleBatch = 0; // bubbles added in the current forward pass (staggers entry)
 
@@ -933,6 +937,26 @@ function addComms(d: Record<string, unknown>) {
     lastCommsCollapsed = true;
     return;
   }
+
+  // Same sender, same words, new stance (concede -> propose): one bubble,
+  // second badge — never the same paragraph twice.
+  if (
+    lastNewBubble &&
+    lastNewBubble.from === from &&
+    rationale &&
+    lastNewBubble.rationale === rationale
+  ) {
+    const route = lastNewBubble.el.querySelector('.comms-route');
+    if (route && !route.textContent!.includes(label)) {
+      const kindEl = document.createElement('span');
+      kindEl.className = `comms-kind ${cls}`;
+      kindEl.textContent = label;
+      route.appendChild(kindEl);
+    }
+    episodeBubbles.set(key, { el: lastNewBubble.el, rounds: 1 });
+    lastCommsCollapsed = true;
+    return;
+  }
   lastCommsCollapsed = false;
 
   if (!chatSides.has(from)) chatSides.set(from, chatSides.size % 2 ? 'right' : 'left');
@@ -967,10 +991,12 @@ function addComms(d: Record<string, unknown>) {
   eventLog.appendChild(el);
   eventLog.scrollTop = eventLog.scrollHeight;
   episodeBubbles.set(key, { el, rounds: 1 });
+  lastNewBubble = { from, rationale, el };
 }
 
 function resetComms() {
   episodeBubbles.clear();
+  lastNewBubble = null;
   lastCommsCollapsed = false;
   bubbleBatch = 0;
   // keep chatColors/chatSides stable across replays so identities don't shift
