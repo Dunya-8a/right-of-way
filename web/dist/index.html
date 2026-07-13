@@ -84,6 +84,30 @@
       border-bottom: 1px solid rgba(0,212,255,0.18);
       padding-bottom: 5px;
     }
+    #info-inner details {
+      border: 1px solid rgba(0,212,255,0.18);
+      border-radius: 5px;
+      margin: 8px 0;
+      padding: 0 14px;
+    }
+    #info-inner details[open] { padding-bottom: 10px; background: rgba(0,212,255,0.03); }
+    #info-inner summary {
+      cursor: pointer; list-style: none;
+      font-size: 12.5px; letter-spacing: 0.16em; color: #7adfff;
+      padding: 10px 0;
+      display: flex; align-items: center; gap: 10px;
+    }
+    #info-inner summary::before { content: '▸'; transition: transform 0.15s; }
+    #info-inner details[open] summary::before { transform: rotate(90deg); }
+    #info-inner details p { font-size: 13.5px; }
+    #info-close {
+      position: absolute; top: 14px; right: 16px;
+      background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.5); font-size: 20px; font-family: inherit;
+      padding: 4px 8px;
+    }
+    #info-close:hover { color: #fff; }
+    #info-inner { position: relative; }
     #info-inner p { margin-bottom: 10px; }
     #info-inner em { color: #ffcc66; font-style: normal; }
     #info-inner strong { color: #fff; }
@@ -180,10 +204,13 @@
     body.clean #legend { bottom: 20px; }
 
     /* ── Legend — what the colors mean, for first-time viewers ───────────── */
+    /* Bottom-right, under the comms panel: the caption lane (center-left)
+       stays clear of it at any width. */
     #legend {
-      position: absolute; left: 28px; bottom: 92px;
+      position: absolute; right: 28px; bottom: 92px;
       z-index: 10;
       display: flex; flex-direction: column; gap: 5px;
+      align-items: flex-end;
       font-size: 11.5px; letter-spacing: 0.06em;
       color: rgba(255,255,255,0.55);
       pointer-events: none;
@@ -539,7 +566,7 @@
       white-space: nowrap; pointer-events: none;
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-C-biotvo.js"></script>
+  <script type="module" crossorigin src="/assets/index-CNk15tge.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -616,62 +643,57 @@
 
   <div id="info-card">
     <div id="info-inner">
+      <button id="info-close" title="Close and explore the view">✕</button>
       <h1>RIGHT OF WAY</h1>
       <div id="info-tagline">An agent-to-agent right-of-way protocol for physical swarms — demoed in orbit</div>
 
-      <h2>WHAT YOU'RE WATCHING</h2>
-      <p>Two satellites are predicted to pass dangerously close. There is no air-traffic
-      control in space — in real life, operators coordinate close approaches by <em>email</em>
-      (in 2019, SpaceX missed ESA's messages because of a paging bug). Here, each satellite
-      has an AI agent. They negotiate <strong>who moves</strong>, in plain English, over the
-      channel on the right — and a deterministic physics engine referees every deal.</p>
+      <p style="margin-top:16px">Two satellites are about to pass dangerously close.
+      <strong>Each has an AI agent. They negotiate who dodges — in plain English — and a
+      physics engine referees every deal.</strong> There's no air-traffic control in orbit;
+      in real life this is coordinated by <em>email</em>. Press ▶ to watch.</p>
 
-      <h2>WAIT — SATELLITES HAVE FUEL?</h2>
-      <p>Yes. Most satellites carry a small tank of propellant for tiny thrusters. Firing
-      them is called a <em>burn</em>. The lifetime supply is measured as
-      <em>Δv (delta-v)</em> — the total change in velocity, in meters per second, the tank
-      can still produce. A typical dodge costs 0.01–0.05% of orbital speed; this demo's
-      burns are 10–45 m/s.</p>
-      <p><strong>Why it matters:</strong> fuel is mission lifetime. Every dodge you make is
-      months of operational life you don't get back — which is exactly why nobody
-      <em>wants</em> to be the one who moves, and why this is a negotiation, not a
-      calculation. When the tank hits zero (or the satellite is dead, like a defunct
-      nanosat), it physically cannot move — someone else must.</p>
+      <details>
+        <summary>WAIT — SATELLITES HAVE FUEL?</summary>
+        <p>Yes: a small tank of propellant for tiny thrusters. Firing them is a
+        <em>burn</em>; the lifetime supply is <em>Δv (delta-v)</em>, measured in m/s.
+        Fuel is mission lifetime — every dodge costs months of operational life, which is
+        why nobody <em>wants</em> to move and this is a negotiation, not a calculation.
+        A dead satellite (or an empty tank) physically can't move — someone else must.</p>
+      </details>
 
-      <h2>WHO HAS RIGHT OF WAY?</h2>
-      <p>Honest answer: <strong>there is no agreed standard</strong> — that's the gap this
-      project pokes at. The demo models a right-of-way policy as a <em>priority number</em>
-      (higher outranks lower — think crewed spacecraft &gt; science missions &gt;
-      mega-constellation sat #4,412 &gt; debris). The norm says the lower-priority party
-      dodges. The interesting moments are when the norm <em>can't</em> hold: the
-      lower-priority satellite is out of fuel, or its operator won't answer — and the agents
-      have to talk their way to who burns instead.</p>
+      <details>
+        <summary>WHO HAS RIGHT OF WAY?</summary>
+        <p>Honestly: <strong>no agreed standard exists</strong> — that's the gap this
+        project pokes at. The demo models it as a <em>priority number</em> (crewed craft
+        &gt; science mission &gt; constellation sat #4,412 &gt; debris); the norm says the
+        lower priority dodges. The interesting moments are when the norm can't hold — no
+        fuel, or an operator who won't answer — and the agents must talk it out.</p>
+      </details>
 
-      <h2>THE PHYSICS REFEREE</h2>
-      <p>The agents can argue, bargain — even lie. It doesn't matter: no agreement counts
-      until a deterministic orbital-mechanics engine confirms the proposed burn actually
-      clears the encounter and fits the mover's fuel budget. After every burn it re-scans
-      the sky — if the dodge created a <em>new</em> close approach, the agents are thrown
-      back to the table. And claims get audited: say "I can't move" while the referee's
-      ground truth shows a full tank, and the deal is voided and the burn lands on
-      <em>you</em>. The judge is physics, not vibes.</p>
+      <details>
+        <summary>THE PHYSICS REFEREE</summary>
+        <p>Agents can argue, bargain, even lie — no deal counts until a deterministic
+        orbital-mechanics engine confirms the burn clears the encounter and fits the fuel
+        budget. Every burn triggers a re-scan (a dodge that creates a <em>new</em> near-miss
+        sends everyone back to the table), and claims are audited: say "I can't move" with
+        a full tank, and the deal is voided — the burn lands on <em>you</em>.</p>
+      </details>
 
-      <h2>READING THE SCREEN</h2>
-      <p><span style="color:#ff5555">Red dots + line</span> = the two objects at risk and
-      their predicted close pass, labeled with how near they'll get.
-      <span style="color:#ffaa00">Orange arrow</span> = the committed dodge burn and its
-      direction. <span style="color:#00ff88">Green</span> = passed safely / all clear.
-      ▶ plays the recorded run; <em>STORY</em> pauses the orbits while each message plays
-      at reading pace. Try the other bundled runs:
-      <a href="?timeline=liar">the lying satellite</a> ·
-      <a href="?timeline=live">a real conjunction from this week</a> ·
-      <a href="?timeline=forced-trade">the synthetic proof</a>.</p>
+      <details>
+        <summary>READING THE SCREEN</summary>
+        <p><span style="color:#ff5555">Red dots + line</span> = the pair at risk and their
+        predicted close pass. <span style="color:#ffaa00">Orange arrow</span> = the dodge
+        burn. <span style="color:#00ff88">Green</span> = safe. <em>STORY</em> pauses the
+        orbits while each message plays. Other runs:
+        <a href="?timeline=liar">the lying satellite</a> ·
+        <a href="?timeline=live">a real conjunction this week</a> ·
+        <a href="?timeline=forced-trade">the synthetic proof</a>.</p>
+      </details>
 
-      <p style="margin-top:14px">Open source (MIT):
-      <a href="https://github.com/Dunya-8a/right-of-way" target="_blank" rel="noopener">github.com/Dunya-8a/right-of-way</a>
-      — the negotiation mechanism is specified domain-independently in
+      <p style="margin-top:14px; font-size:12.5px">MIT ·
+      <a href="https://github.com/Dunya-8a/right-of-way" target="_blank" rel="noopener">github.com/Dunya-8a/right-of-way</a> ·
       <a href="https://github.com/Dunya-8a/right-of-way/blob/main/PROTOCOL.md" target="_blank" rel="noopener">PROTOCOL.md</a>
-      (same loop works for drones, ships, any fleet with no central boss).</p>
+      (the same loop works for drones, ships — any fleet with no central boss)</p>
 
       <button id="info-dismiss">GOT IT — PRESS ▶ TO WATCH</button>
     </div>

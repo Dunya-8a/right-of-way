@@ -1362,7 +1362,11 @@ speedSel.addEventListener('change', () => { speed = parseFloat(speedSel.value); 
   };
   document.getElementById('info-btn')?.addEventListener('click', open);
   document.getElementById('info-dismiss')?.addEventListener('click', close);
+  document.getElementById('info-close')?.addEventListener('click', close);
   card.addEventListener('click', e => { if (e.target === card) close(); });
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && card.classList.contains('visible')) close();
+  });
   // First visit: explain before playing. Never in recording/autoplay modes.
   let seen = false;
   try { seen = !!localStorage.getItem('row-intro-seen'); } catch { seen = true; }
