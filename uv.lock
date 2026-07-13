@@ -1694,6 +1694,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "numpy" },
     { name = "pydantic" },
+    { name = "sgp4" },
     { name = "uvicorn" },
     { name = "weave" },
 ]
@@ -1716,6 +1717,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.26" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "sgp4", specifier = ">=2.25" },
     { name = "sgp4", marker = "extra == 'physics'", specifier = ">=2.23" },
     { name = "skyfield", marker = "extra == 'physics'", specifier = ">=1.49" },
     { name = "uvicorn", specifier = ">=0.48.0" },

@@ -15,7 +15,20 @@ Everyone distrusts LLM-as-judge. This is the opposite construction: **LLM agents
 - The referee owns *feasibility*: every proposed burn is propagated (exact two-body, universal variables), re-screened for conjunctions, and checked against the mover's fuel budget. A burn that doesn't clear is rejected, whatever the transcript says.
 - The loop **re-screens after every maneuver**: if a dodge creates a *new* near-miss with a third satellite, the referee throws the agents back to the table. A "solution" that creates a new problem doesn't count as a solution.
 
-The one-sentence identity: *a testbed for LLM negotiation under a ground-truth verifier.* The satellites are the (real, unsolved) application.
+The one-sentence identity: *a testbed for LLM negotiation under a ground-truth verifier.* The satellites are the (real, unsolved) application — and the mechanism is written down as a domain-independent spec: **[PROTOCOL.md](PROTOCOL.md)** (roles, message grammar, verify-and-repair loop, fallback chain, and the audit rule). This repo is its reference implementation; a new domain needs only a deterministic referee, a conflict definition, and an action type.
+
+## It runs on real, live conjunctions
+
+`--scenario live` fetches the current top predicted close approaches from [CelesTrak SOCRATES](https://celestrak.org/SOCRATES/) — real satellite pairs, real TCAs, updated three times a day — pulls both objects' TLEs, seeds the world just before closest approach, and lets the agents negotiate **a conjunction that is actually on the books this week**:
+
+```
+$ uv run python -m row.orchestrator --scenario live --topology swarm
+live pick 2: LIVE: STARLINK-3068 / VELOX-I — real conjunction, TCA Jul 13 08:31 UTC (SOCRATES)
+  STARLINK-3068  CONCEDE  "…VELOX-I has declared it cannot maneuver, I will take the avoidance burn"
+  === BURN STARLINK-3068  45.0 m/s
+```
+
+(That was real: an operational Starlink dodging VELOX-I, a defunct Singaporean nanosat, predicted 18 m apart the next morning. Names, pair, and TCA are SOCRATES's; once seeded, propagation is our two-body core, and fuel/priority are modeled operator policies — see the honesty notes in `row/scenario_live.py`. The auto-selector only runs pairs our own screener independently re-confirms with today's TLEs.)
 
 ## The synthetic proof that the agents are load-bearing
 
@@ -75,6 +88,9 @@ uv sync
 # the Sept 2019 Aeolus / Starlink-44 re-enactment (real names, reconstructed geometry)
 uv run python -m row.orchestrator --scenario aeolus --topology swarm
 
+# TODAY'S real predicted conjunction, live from CelesTrak SOCRATES (needs network)
+uv run python -m row.orchestrator --scenario live --topology swarm
+
 # the synthetic forced-trade proof (the "it's not an if-statement" scenario)
 uv run python -m row.orchestrator --topology swarm
 
@@ -89,7 +105,7 @@ uv run python -m row.eval --leaderboard      # swarm/hierarchical × mock/claude
 cd web && pnpm install && pnpm dev       # the 3D viz — plays the emitted Timeline in story mode
 ```
 
-The viz opens on the Aeolus re-enactment and narrates it: **story mode** freezes the orbital clock at each negotiation, plays the messages beat-by-beat, and shows the referee verifying every burn. URL params: `?timeline=forced-trade` (the synthetic scenario), `?autoplay`, `?clean` (hide the chrome — for recording clips).
+The viz opens on the Aeolus re-enactment and narrates it: **story mode** freezes the orbital clock at each negotiation, plays the messages beat-by-beat, and shows the referee verifying every burn. URL params: `?timeline=forced-trade` / `?timeline=liar` / `?timeline=live` (the bundled runs), `?autoplay`, `?clean` (hide the chrome — for recording clips).
 
 > **Honesty note on the re-enactment:** it reconstructs the documented *encounter geometry* (320 km, crossing planes, sub-km predicted miss, TCA 2019-09-02 ~11:02 UTC) under two-body dynamics — it is not archival TLE propagation. Starlink-44 could physically maneuver in 2019; SpaceX declined / was unreachable, and we model "will not / cannot coordinate a burn" as a ~zero maneuver budget while the agent's prompt carries the real operational story. See `row/scenario_real.py`.
 
@@ -100,6 +116,7 @@ row/
 ├── contracts.py            # pydantic v2 data models — the single source of truth
 ├── scenario.py             # generate_scenario() — the synthetic forced-trade constellation
 ├── scenario_real.py        # generate_aeolus_scenario() — the Sept 2019 re-enactment
+├── scenario_live.py        # generate_live_scenario() — today's real conjunctions (SOCRATES)
 ├── physics/                # the deterministic referee (NumPy, two-body universal variables)
 │   ├── core.py             #   PhysicsCore: propagate / screen_conjunctions / apply_maneuver
 │   ├── screening.py        #   coarse sampling + golden-section refinement per close approach

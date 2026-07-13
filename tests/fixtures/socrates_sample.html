@@ -1,0 +1,396 @@
+<!doctype html>
+
+<html>
+
+<head>
+
+<title>CelesTrak: SOCRATES Plus Search Results</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script language="JavaScript" src="/satcat/data.js"></script>
+
+<link rel="stylesheet" href="/web/bootstrap4/css/bootstrap.min.css">
+<script src="/web/jquery/jquery-3.7.1.min.js"></script>
+<script src="/web/popper/umd/popper.min.js"></script>
+<script src="/web/bootstrap4/js/bootstrap.min.js"></script>
+
+<link rel="stylesheet" type="text/css" href="/new-site.css">
+
+<link rel="stylesheet" href="/web/fontawesome/css/all.css">
+
+<link rel="stylesheet" type="text/css" href="/web/dataTables/dataTables.mod.css">
+
+<script type="text/javascript" charset="utf8" src="/web/dataTables/datatables.min.js"></script>
+
+<script type="text/javascript">
+	function openWindowData(gpQuery) {
+	  var leftSide = window.screenLeft + 100;
+    var topSide = window.screenTop + 100;
+    popupWin = window.open(gpQuery, 'GP-Data', `width=1200,height=150,scrollbars=yes,status=yes,left=${leftSide},top=${topSide}`);
+	}
+  function openWindowPlot(plotQuery) {
+    var leftSide = window.screenLeft + 100;
+    var topSide = window.screenTop + 100;
+    popupWin = window.open(plotQuery, 'TCA-Range-Speed', `scrollbars,resizable,width=1000,height=640,left=${leftSide},top=${topSide}`);
+  }
+</script>
+
+<style>
+th, td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+a.button {
+  background-color: whitesmoke;
+  color: black;
+  border: 1px solid black;
+  border-radius: 5px;
+  padding: 1px 5px 1px 5px;
+  cursor: pointer;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class=container>
+
+<nav class="navbar navbar-expand-lg lightBG navbar-light">
+	<a class="navbar-brand" href="https://celestrak.org/">CelesTrak<sup>&reg;</sup>
+  <img src="/images/CT-icon-256-t.png" alt="CelesTrak" style="width: 64px;"></a>
+	<!-- Toggler/collapsibe Button -->
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsibleNavbar">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+	<!-- Navbar links -->
+	<div class="collapse navbar-collapse" id="collapsibleNavbar">
+  <ul class=navbar-nav>
+  	<li class=nav-item dropdown>
+			<a class="nav-link dropdown-toggle" href="#" id="navbardrop" data-toggle="dropdown">Orbital Data</a>
+      <div class="dropdown-menu lightBG mediumSize">
+        <a class="dropdown-item" href="/NORAD/elements/">Current Data (GP)</a>
+        <a class="dropdown-item" href="/NORAD/documentation/gp-data-formats.php">A New Way to Obtain GP Data</a>
+        <a class="dropdown-item" href="/NORAD/elements/gp-statistics.php">GPE Statistics</a>
+        <a class="dropdown-item" href="/NORAD/archives/request.php">Special Data Request (GP)</a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item" href="/NORAD/elements/supplemental/">Supplemental Data (SupGP)</a>
+        <a class="dropdown-item" href="/NORAD/documentation/sup-gp-queries.php">How to Perform SupGP Queries</a>
+        <a class="dropdown-item" href="/NORAD/elements/supplemental/table-rms.php?UNIQUE&WORSE-THAN=25">SupGP vs. GP Comparisons</a>
+        <a class="dropdown-item" href="/NORAD/elements/supplemental/supgp-statistics.php">SupGP Statistics</a>
+        <a class="dropdown-item" href="/NORAD/archives/sup-request.php">Special Data Request (SupGP)</a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item" href="/NORAD/documentation/">Documentation</a>
+      </div>
+  	</li>
+  	<li class=nav-item dropdown>
+			<a class="nav-link dropdown-toggle" href="#" id="navbardrop" data-toggle="dropdown">Satellite Catalog</a>
+      <div class="dropdown-menu lightBG mediumSize">
+        <a class="dropdown-item" href="/satcat/">SATCAT</a>
+        <a class="dropdown-item" href="/satcat/search.php">Search the SATCAT</a>
+        <a class="dropdown-item" href="/satcat/satcat-format.php">SATCAT Documentation</a>
+        <a class="dropdown-item" href="/satcat/boxscore.php">SATCAT Boxscore</a>
+        <a class="dropdown-item" href="/satcat/launch-boxscore.php">Launch Boxscore</a>
+        <a class="dropdown-item" href="/satcat/launchsites.php">Maps of Launch Sites</a>
+      </div>
+  	</li>
+
+  	<li class=nav-item dropdown>
+			<a class="nav-link dropdown-toggle" href="#" id="navbardrop" data-toggle="dropdown">SOCRATES</a>
+      <div class="dropdown-menu lightBG mediumSize">
+        <a class="dropdown-item" href="/SOCRATES/">SOCRATES Plus</a>
+        <a class="dropdown-item" href="/SOCRATES/search.php">Search SOCRATES Plus</a>
+        <a class="dropdown-item" href="/SOCRATES/socrates-format.php">SOCRATES Plus Format Documentation</a>
+      </div>
+  	</li>
+<!--
+    <li class="nav-item">
+      <a class="nav-link" href="https://celestrak.org/SOCRATES/">SOCRATES</a>
+    </li>
+-->
+  	<li class=nav-item dropdown>
+			<a class="nav-link dropdown-toggle" href="#" id="navbardrop" data-toggle="dropdown">Space Data</a>
+      <div class="dropdown-menu lightBG mediumSize">
+        <a class="dropdown-item" href="/GPS/">GPS Status, Almanacs, NANUs</a>
+        <a class="dropdown-item" href="/SpaceData/">Earth Orientation Parameters</a>
+        <a class="dropdown-item" href="/SpaceData/">Space Weather Data</a>
+      </div>
+  	<li class=nav-item dropdown>
+			<a class="nav-link dropdown-toggle" href="#" id="navbardrop" data-toggle="dropdown">Library</a>
+      <div class="dropdown-menu lightBG mediumSize">
+        <a class="dropdown-item" href="/columns/"><i>Satellite Times</i> Columns</a>
+        <a class="dropdown-item" href="/publications/">T.S. Kelso's Publications</a>
+        <a class="dropdown-item" href="/software/">Software Repository</a>
+        <a class="dropdown-item" href="/software/tutorials/"><b>NEW: Software Tutorials</b></a>
+      </div>
+  	</li>
+  </ul>
+	</div>
+  <div style="display: flex; justify-content: center; margin-top: 1em;">
+    <a target=donate href="https://giving.gofundme.com/campaign/750670/donate/" title="Help us fund CelesTrak operations and future development!" alt="Please donate!"><img border=0 src="/images/donate.gif"></a>
+  </div>
+</nav>
+<br>
+<div class="alert alert-danger"><b>URGENT: We ran out of 5-digit catalog numbers with the <a href="/satcat/table-satcat.php?CATNR=100000">addition of Saramago</a> on 2026-07-11.
+  We had <a target=bluesky href="https://bsky.app/profile/tskelso.bsky.social/post/3mlg2dpuqds2n" title="Estimate as of 2026&#8209;05&#8209;09">estimated 
+  that to occur around 2026&#8209;07&#8209;12</a> back on 2026-05-09.
+  
+  The official USSF SATCAT is now at 100000.
+  
+  All newly cataloged objects will have 6-digit catalog numbers of 100000+ and GP data will not be available for them using the TLE format. 
+  <a href="/NORAD/documentation/gp-data-formats.php" title="A New Way to Obtain GP Data">CelesTrak developed new formats</a> that removed the 5-digit
+  catalog number limitation (and finally fixed the Y2K problem) in May 2020 and immediately began providing GP data in those formats for software developers.
+  Please be sure to adhere to our <a href="/usage-policy.php">usage policy</a> when retrieving any CelesTrak data.
+
+  The same limitations apply to the <a href="/satcat/satcat-format.php" title="SATCAT Format Documentation">legacy fixed-field SATCAT</a>.
+  That legacy format will continue to update but will only contain data for objects with catalog numbers below 70000.
+  Be sure to follow <a target=bluesky href="https://bsky.app/profile/tskelso.bsky.social">@TSKelso on Bluesky</a> for the latest updates, tutorials, 
+  and changes as we move forward. Spread the word!</b> <i>&#8209;&nbsp;TS</i>
+</div>
+
+<table class=center>
+<tr><td class=center width=125><a href="/SOCRATES/"><img border=0 src="/images/socrates.jpg" width=79 height=125 valign=middle></a></td>
+    <td width=400>
+    	<a href="/SOCRATES/"><h1 class=center>SOCRATES Plus</h1></a>
+    	<h2 class=center>Search Results</h2></td>
+    <td width=125>
+    <img src="/images/CT-icon-256-t.png" alt="CelesTrak" height=100>
+    </td></tr>
+</table>
+
+<hr width=50%>
+
+<table class=center width=50%>
+<tr align=left><td>
+	<p>Search parameters:
+	<ul>
+<li>Name(s): Top 5 by Maximum Probability</li>
+<li>Order by Maximum Probability</li>
+<li>Return first 5 items</li>
+</ul>
+</p>
+</td></tr>
+</table>
+
+<hr width=50%>
+
+<table class=center width=650>
+  <tr align=center><td>
+    <p><i>Data current as of 2026 Jul 12 10:07:26 UTC</i></p>
+    <p>Computation Interval: Start = 2026 Jul 12 10:00:00 UTC, Stop = 2026 Jul 19 10:00:00 UTC<br>
+       Computation Threshold: 5.0 km<br>
+       Considering: 15,987 Primaries, 31,923 Secondaries (145,262 Conjunctions)<br>
+       <a href="/NORAD/elements/table-last.php?SPECIAL=impending">9 SGP4 Propagation Errors</a><br>
+       Computation run time: 11h 27m 46.488s</p>
+  </td></tr>
+</table>
+<p class=center><a href="socrates-format.php"><em>SOCRATES Format Documentation</em></a></p>
+
+<p class=center><a href="#notes"><em>See notes at bottom of page for data field descriptions</em></a></p>
+
+<table class="center outline">
+<tr class=header>
+    <th rowspan=2>Data<br>&<br>Graphs</th>
+    <th rowspan=2><a title="Resort NORAD Catalog Number &uarr;" href="table-socrates.php?NAME=,&ORDER=SSC&MAX=5&FORMAT=CSV">NORAD<br>Catalog<br>Number</a></th>
+    <th rowspan=2 width=250>Name [Ops Status]</th>
+    <th rowspan=2>Days<br>Since<br>Epoch</th>
+    <th rowspan=2><a title="Resort TCA &uarr;" href="table-socrates.php?NAME=,&ORDER=TCA&MAX=5&FORMAT=CSV">TCA<br>(UTC)</a></th>
+    <th><a title="Resort Min Range &uarr;" href="table-socrates.php?NAME=,&ORDER=MINRANGE&MAX=5&FORMAT=CSV">Min<br>Range<br>(km)</a></th>
+    <th><a title="Resort Relative Speed &darr;" href="table-socrates.php?NAME=,&ORDER=RELSPEED&MAX=5&FORMAT=CSV">Relative<br>Speed<br>(km/sec)</a></th></tr>
+<tr class=header>
+    <th><a title="Resort Max Prob &darr;" href="table-socrates.php?NAME=,&ORDER=MAXPROB&MAX=5&FORMAT=CSV">Max<br>Probability</a></th>
+    <th>Dilution<br>Threshold<br>(km)</th></tr>
+<tr align=center>
+<td> <a class=button onclick="openWindowData('data.php?CATNR=57023,67744')">GP Data</a></td>
+
+  <td>57023</td>
+  <td>OBJECT V [+]</td>
+  <td>5.104</td>
+  <td rowspan=2>2026-07-17 06:10:08.170</td>
+  <td>0.011</td>
+  <td >7.485</td>
+  </tr>
+<tr align=center>
+<td> <a class=button title="TCA Range & Speed Graph [50 km]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=57023,67744&MAXRANGE=50')">50 km</a>  <a class=button title="TCA Range & Speed Graph [All]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=57023,67744&MAXRANGE=0')">All</a></td>
+  <td>67744</td>
+  <td>STARLINK-36692 [+]</td>
+  <td>5.170</td>
+  <td>4.575E-01</td>
+  <td>0.002</td>
+  </tr>
+<tr class=shade align=center>
+<td> <a class=button onclick="openWindowData('data.php?CATNR=57926,61960')">GP Data</a></td>
+
+  <td>57926</td>
+  <td>STARLINK-30468 [P]</td>
+  <td>4.319</td>
+  <td rowspan=2>2026-07-16 04:53:51.692</td>
+  <td>0.033</td>
+  <td >10.029</td>
+  </tr>
+<tr class=shade align=center>
+<td> <a class=button title="TCA Range & Speed Graph [50 km]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=57926,61960&MAXRANGE=50')">50 km</a>  <a class=button title="TCA Range & Speed Graph [All]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=57926,61960&MAXRANGE=0')">All</a></td>
+  <td>61960</td>
+  <td>STARLINK-32372 [+]</td>
+  <td>4.148</td>
+  <td>2.371E-01</td>
+  <td>0.010</td>
+  </tr>
+<tr align=center>
+<td> <a class=button onclick="openWindowData('data.php?CATNR=49154,40057')">GP Data</a></td>
+
+  <td>49154</td>
+  <td>STARLINK-3068 [+]</td>
+  <td>1.589</td>
+  <td rowspan=2>2026-07-13 08:31:48.157</td>
+  <td>0.018</td>
+  <td >14.276</td>
+  </tr>
+<tr align=center>
+<td> <a class=button title="TCA Range & Speed Graph [50 km]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=49154,40057&MAXRANGE=50')">50 km</a>  <a class=button title="TCA Range & Speed Graph [All]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=49154,40057&MAXRANGE=0')">All</a></td>
+  <td>40057</td>
+  <td>VELOX-I [-]</td>
+  <td>1.181</td>
+  <td>1.777E-01</td>
+  <td>0.009</td>
+  </tr>
+<tr class=shade align=center>
+<td> <a class=button onclick="openWindowData('data.php?CATNR=57023,68399')">GP Data</a></td>
+
+  <td>57023</td>
+  <td>OBJECT V [+]</td>
+  <td>6.798</td>
+  <td rowspan=2>2026-07-18 22:50:17.551</td>
+  <td>0.041</td>
+  <td >3.888</td>
+  </tr>
+<tr class=shade align=center>
+<td> <a class=button title="TCA Range & Speed Graph [50 km]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=57023,68399&MAXRANGE=50')">50 km</a>  <a class=button title="TCA Range & Speed Graph [All]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=57023,68399&MAXRANGE=0')">All</a></td>
+  <td>68399</td>
+  <td>STARLINK-37187 [+]</td>
+  <td>7.586</td>
+  <td>6.756E-02</td>
+  <td>0.010</td>
+  </tr>
+<tr align=center>
+<td> <a class=button onclick="openWindowData('data.php?CATNR=51852,69790')">GP Data</a></td>
+
+  <td>51852</td>
+  <td>STARLINK-3542 [+]</td>
+  <td>5.978</td>
+  <td rowspan=2>2026-07-18 03:28:49.837</td>
+  <td>0.042</td>
+  <td >1.708</td>
+  </tr>
+<tr align=center>
+<td> <a class=button title="TCA Range & Speed Graph [50 km]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=51852,69790&MAXRANGE=50')">50 km</a>  <a class=button title="TCA Range & Speed Graph [All]" onclick="openWindowPlot('graph-tca-range-speed.php?CATNR=51852,69790&MAXRANGE=0')">All</a></td>
+  <td>69790</td>
+  <td>KUIPER-00647 [+]</td>
+  <td>5.978</td>
+  <td>6.572E-02</td>
+  <td>0.010</td>
+  </tr>
+</table><br>
+
+<p class=center>5 records found</p>
+
+<table class=center width=650>
+<tr align=left><td>
+<a name="notes">Data Fields:</a>
+<ul>
+<li><em>Data:</em> The GP Data button links to a page which provides the GP data
+used to generate the associated prediction.</li>
+
+<li><em>NORAD Catalog Number:</em> NORAD Catalog Numbers of the two conjuncting
+objects.</li>
+
+<li><em>Name:</em> SATCAT names of the two conjuncting objects. Operational
+status of each object is shown in brackets, using the <A
+href="/satcat/status.php">standard CelesTrak SATCAT codes</a>.</li>
+
+<li><em>Days Since Epoch:</em> The number of days from the epoch of the NORAD GP
+or SupGP (green) element set used to produce the prediction until the time of
+closest approach for the conjunction.</li>
+
+<li><em>TCA (UTC):</em> Time of closest approach.</li>
+
+<li><em>Min Range (km):</em> The distance between the two conjuncting objects at
+the time of closest approach.</li>
+
+<li><em>Relative Speed (km/sec):</em> Relative speed of the two conjuncting
+objects at the time of closest approach.</li>
+
+<li><em>Max Probability:</em> Given fixed spherical object radii and relative
+distance at the time of closest approach (TCA), the projected covariance ellipse
+is sized and oriented to produce the maximum probability. For these reports the
+ratio of major-to-minor axes of the projected covariance ellipse is set using
+radial, in-track, and cross-track values of 100 m, 300 m, 100 m, respectively.
+If the combined object radius is greater than the relative distance, the maximum
+probability will be one; such occurrences are not addressed here. For more
+details on the maximum probability method, see Dr. Sal Alfano's paper titled
+<a href="AIAA-03-548.pdf">"Relating Position Uncertainty to Maximum Conjunction
+Probability"</a>.</li>
+
+<li><em>Dilution Threshold (km):</em> The standard deviation that produces the
+maximum probability defines the threshold of dilution. A smaller or larger
+standard deviation will produce a smaller probability. In the case of computing
+true probability with a smaller standard deviation, the data is of sufficient
+quality to associate low probability with low risk. For a larger standard
+deviation, this is not the case and the resulting true probability calculation
+becomes "diluted."  If operating in this dilution region, the recommendation is
+to obtain better data and reassess the encounter. If time or resources do not
+permit, then the maximum probability should be used in place of the true
+probability.</li>
+
+<li><em>SGP4 Propagation Errors:</em> A list of objects which were not screened
+because their GP data shows they have already decayed (but haven't yet been
+reflected in the SATCAT) or will decay prior to the end of the computation
+interval.</li>
+</ul>
+</td></tr>
+</table>
+
+
+<br>
+<footer class="footer lightBG">
+	<div class="d-flex justify-content-between align-items-center">
+		<span class=NOmobile>
+		<img src="/images/CT-icon-256-t.png" alt="CelesTrak" height=100 style="padding-left: 25px; padding-right: 50px;">
+		</span>
+  	<span class="center mediumSize" style="padding-top: 10px; padding-bottom: 10px; font-style: italic; margin: auto;">
+    	<a href="/webmaster.php" title="About the Webmaster">Dr. T.S. Kelso</a>
+    	<a href="mailto:TS.Kelso@celestrak.org">[TS.Kelso@celestrak.org]</a><br>
+    	Follow <a href="https://bsky.app/profile/tskelso.bsky.social">@TSKelso</a> on Bluesky<br>
+  		  Last updated: 2026 Jul 12 22:37:33 UTC<br>
+  Accessed 421,851 times<br>
+  Current system time: 2026 Jul 13 02:39:24 UTC<br>
+  		<a tabindex="0" title="CelesTrak's Simple Privacy Policy" data-toggle="popover" data-trigger="focus"
+  		data-placement="top" data-content="We do not use cookies on CelesTrak and
+  		we do not collect any personal information, other than IP addresses, which
+  		are used to detect and block malicious activity and to assess system
+  		performance. We do not use IP addresses for tracking or any other
+  		purposes. No personal data is shared with third parties."><span style="color:blue">CelesTrak's
+  		Simple Privacy Policy</span></a>
+  	</span>
+		<span class=NOmobile>
+		<img src="/images/CT-icon-256-t.png" alt="CelesTrak" height=100 style="padding-left: 50px; padding-right: 25px;">
+		</span>
+	</div>
+</footer>
+
+<script>
+$(document).ready(function(){
+    $('[data-toggle="popover"]').popover();   
+});
+$('.popover-dismiss').popover({
+  trigger: 'focus'
+});
+</script>
+</div>
+
+</body>
+
+</html>

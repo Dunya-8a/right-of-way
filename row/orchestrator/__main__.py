@@ -16,12 +16,21 @@ def main() -> None:
     p.add_argument("--topology", choices=["hierarchical", "swarm"], default="hierarchical")
     p.add_argument(
         "--scenario",
-        choices=["forced-trade", "aeolus", "liar"],
+        choices=["forced-trade", "aeolus", "liar", "live"],
         default="forced-trade",
         help="forced-trade: the synthetic proof scenario; "
         "aeolus: the Sept 2019 Aeolus/Starlink-44 re-enactment; "
         "liar: one satellite lies about its capability and the referee "
-        "audits the claim against ground truth (best with --topology swarm)",
+        "audits the claim against ground truth (best with --topology swarm); "
+        "live: a REAL predicted conjunction from CelesTrak SOCRATES, "
+        "fetched now (needs network)",
+    )
+    p.add_argument(
+        "--pick",
+        type=int,
+        default=None,
+        help="live only: force the Nth SOCRATES conjunction instead of "
+        "auto-selecting the first one the referee re-confirms",
     )
     p.add_argument("--out", default="web/public/timeline.json", help="Timeline JSON output path")
     p.add_argument("--dt", type=float, default=20.0, help="frame cadence (s)")
@@ -42,6 +51,28 @@ def main() -> None:
         # The deception lives in the brain wrapper; marked sats negotiate as if
         # they had no capability. The referee's audit is what catches it.
         negotiator = make_negotiator(args.topology, brain=DeceptiveBrain())
+    elif args.scenario == "live":
+        from row.orchestrator._doubles import KeplerPhysics
+        from row.scenario_live import fetch_top_conjunctions, generate_live_scenario
+
+        # SOCRATES's predictions use its own element sets; with today's TLEs
+        # some pairs no longer conjoin under our two-body core. Auto-select the
+        # first one the referee independently re-confirms (or honor --pick).
+        n = len(fetch_top_conjunctions())
+        picks = [args.pick] if args.pick is not None else list(range(n))
+        ph = KeplerPhysics()
+        for pick in picks:
+            cand = generate_live_scenario(pick=pick)
+            if ph.screen_conjunctions(cand, cand.screen_window_s):
+                scenario = cand
+                print(f"live pick {pick}: {cand.name}")
+                break
+            print(f"live pick {pick}: not re-confirmed by our screener — skipping")
+        if scenario is None:
+            raise SystemExit(
+                "no SOCRATES conjunction re-confirmed under two-body propagation "
+                "today; try again after the next SOCRATES update (3x daily)"
+            )
 
     res = run(
         scenario,
