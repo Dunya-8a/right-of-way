@@ -402,6 +402,20 @@ function removeConjLine(key: string) {
 
 function clearAllConj() { [...conjLines.keys()].forEach(k => removeConjLine(k)); }
 
+// After a verified dodge burn, the pair is still shown (re-screen pending) but
+// no longer reads as danger: line + label flip to "dodge in progress".
+function markConjClearing(a: string, b: string) {
+  const key = ck(a, b);
+  const line = conjLines.get(key);
+  if (line) (line.material as THREE.LineBasicMaterial).color.setHex(0xffaa00);
+  const mid = conjMidPts.get(key);
+  if (mid) {
+    const div = mid.element as HTMLElement;
+    div.className = 'conj-label clearing';
+    div.textContent = '✓ dodge in progress';
+  }
+}
+
 function updateConjLinePositions() {
   conjLines.forEach((line, key) => {
     const [aId, bId] = key.split(':');
@@ -483,7 +497,7 @@ function addManeuverArrow(objId: string, dv: Vec3) {
   const dir = new THREE.Vector3(...dv);
   if (dir.lengthSq() < 1e-12) return;
   dir.normalize();
-  const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(), 0.22, COL.PROPOSAL, 0.06, 0.032);
+  const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(), 0.16, COL.PROPOSAL, 0.03, 0.014);
   const sat = sats.get(objId);
   if (sat) { arrow.position.copy(sat.mesh.position); scene.add(arrow); manArrows.set(objId, arrow); }
 }
@@ -559,9 +573,9 @@ function applyOneEvent(ev: TLEvent) {
         upsertConjLine(aId, bId);
         episodeBubbles.clear(); // a new conjunction opens a new negotiation episode
         const prefix = ev.type === 'new_conjunction'
-          ? '⚖ RE-SCREEN ✗  NEW CONJUNCTION'
-          : 'CONJUNCTION';
-        log(ev.t, `${prefix}  ${aId} / ${bId}  —  miss ${miss.toFixed(1)} km`, 'danger');
+          ? '⚖ RE-SCREEN ✗  NEW COLLISION RISK'
+          : 'COLLISION RISK';
+        log(ev.t, `${prefix}  ${aId} / ${bId}  —  will pass ${miss.toFixed(1)} km apart`, 'danger');
         if (ev.type === 'new_conjunction') {
           enqueueCaption(
             'THE DODGE CREATED A NEW NEAR-MISS',
@@ -570,8 +584,8 @@ function applyOneEvent(ev: TLEvent) {
           );
         } else {
           const tca = d['tca'] as number | undefined;
-          const eta = tca ? ` — closest approach in ${Math.round((tca - ev.t) / 60)} min` : '';
-          enqueueCaption('COLLISION COURSE', `${aId} / ${bId}, miss distance ${miss.toFixed(1)} km${eta}`, '#ff4d5e');
+          const eta = tca ? ` in ${Math.round((tca - ev.t) / 60)} minutes` : '';
+          enqueueCaption('COLLISION COURSE', `${aId} and ${bId} will pass ${miss.toFixed(1)} km apart${eta}`, '#ff4d5e');
         }
         break;
       }
@@ -611,9 +625,20 @@ function applyOneEvent(ev: TLEvent) {
         const objId = d['obj_id'] as string;
         clearProposal();
         addManeuverArrow(objId, d['dv_vector'] as Vec3);
+        activeConjs
+          .filter(c => c.aId === objId || c.bId === objId)
+          .forEach(c => markConjClearing(c.aId, c.bId));
         const dvMs = (d['est_dv_cost'] as number) * 1000;
-        log(ev.t, `⚖ ✓ BURN  ${objId}  —  Δv ${dvMs.toFixed(1)} m/s`, 'maneuver');
-        enqueueCaption(`BURN — ${objId.toUpperCase()}`, `Δv ${dvMs.toFixed(1)} m/s, verified by the physics referee`, '#ffa060');
+        log(ev.t, `⚖ ✓ BURN  ${objId}  —  ${dvMs.toFixed(1)} m/s of fuel`, 'maneuver');
+        enqueueCaption(`BURN — ${objId.toUpperCase()}`, `${dvMs.toFixed(1)} m/s of fuel — the physics referee verified it clears`, '#ffa060');
+        break;
+      }
+      case 'safe_pass': {
+        const aId = d['a_id'] as string, bId = d['b_id'] as string;
+        activeConjs = activeConjs.filter(c => ck(c.aId, c.bId) !== ck(aId, bId));
+        removeConjLine(ck(aId, bId));
+        log(ev.t, `SAFE PASS  ${aId} / ${bId}  —  closest approach over, no collision`, 'safe');
+        enqueueCaption('SAFE PASS ✓', `${aId} and ${bId} clear each other — the dodge worked`, '#3ddc97');
         break;
       }
       case 'resolved': {
@@ -651,6 +676,7 @@ function beatDuration(item: NarrationItem): number {
     base = Math.min(1200 + len * 8, 2800); // reading time scales with the words
   } else if (item.type === 'referee-verify') base = 1400;
   else if (item.type === 'conjunction_detected' || item.type === 'new_conjunction') base = 2000;
+  else if (item.type === 'safe_pass') base = 2200; // let the all-clear land
   else base = 1100;
   // The speed selector also paces the story: 60× reads brisk, 10× leisurely.
   return base * Math.min(1.5, Math.max(0.5, 30 / speed));
@@ -752,8 +778,8 @@ function updatePhaseBadge() {
   } else if (activeConjs.length > 0) {
     phaseBadge.className = 'danger';
     phaseText.textContent = activeConjs.length > 1
-      ? `${activeConjs.length} ACTIVE CONJUNCTIONS`
-      : `CONJUNCTION — ${activeConjs[0].aId} / ${activeConjs[0].bId}`;
+      ? `${activeConjs.length} ACTIVE COLLISION RISKS`
+      : `COLLISION RISK — ${activeConjs[0].aId} / ${activeConjs[0].bId}`;
   } else {
     phaseBadge.className = '';
     phaseText.textContent = 'ALL CLEAR';
@@ -928,6 +954,7 @@ const EVT_MARK_CLASS: Record<string, string> = {
   new_conjunction:      'danger',
   proposal:             'proposal',
   maneuver_committed:   'maneuver',
+  safe_pass:            'safe',
   resolved:             'safe',
 };
 
@@ -956,6 +983,26 @@ let speed    = 30;
 let trailTick = 0;
 
 function loadTimeline(data: Timeline) {
+  // Synthesize SAFE PASS beats: the recorded run has no event at closest
+  // approach, so "did they actually collide?" was never answered on screen.
+  // If the run resolved, each risk pair's TCA becomes an explicit all-clear.
+  if (
+    data.events.some(e => e.type === 'resolved') &&
+    !data.events.some(e => e.type === 'safe_pass')
+  ) {
+    const synth: TLEvent[] = data.events
+      .filter(
+        e =>
+          (e.type === 'conjunction_detected' || e.type === 'new_conjunction') &&
+          typeof e.data['tca'] === 'number',
+      )
+      .map(e => ({
+        t: (e.data['tca'] as number) + 1,
+        type: 'safe_pass' as const,
+        data: { a_id: e.data['a_id'], b_id: e.data['b_id'] },
+      }));
+    data.events = [...data.events, ...synth].sort((x, y) => x.t - y.t);
+  }
   tl = data;
   tMin = data.frames[0]?.t ?? 0;
   tMax = data.frames.at(-1)?.t ?? 1;
@@ -1192,16 +1239,34 @@ storyBtn?.addEventListener('click', () => {
   guided = !guided;
   if (!guided) flushNarration();
   storyBtn.classList.toggle('on', guided);
+  storyBtn.textContent = guided ? '✦ STORY ON' : '✦ STORY OFF';
 });
 
-document.getElementById('live-btn')?.addEventListener('click', () => {
-  fetchLiveEarth(earthMat).catch(console.warn);
+// One-shot: swaps the globe texture for today's real imagery; nothing to undo.
+document.getElementById('live-btn')?.addEventListener('click', async e => {
+  const btn = e.currentTarget as HTMLButtonElement;
+  btn.disabled = true;
+  btn.style.opacity = '0.45';
+  try {
+    await fetchLiveEarth(earthMat);
+    btn.textContent = '🌍 HD EARTH ✓';
+  } catch (err) {
+    console.warn(err);
+    btn.disabled = false;
+    btn.style.opacity = '';
+  }
 });
 
 // ── RUN SIMULATION button ─────────────────────────────────────────────────────
 {
   const runBtn = document.getElementById('run-btn') as HTMLButtonElement | null;
   const API = 'http://localhost:8000';
+
+  // The button re-runs the simulation via the local Python API. Most viewers
+  // don't have that running — only show the button when the API answers.
+  fetch(`${API}/openapi.json`, { method: 'GET' })
+    .then(r => { if (r.ok && runBtn) runBtn.hidden = false; })
+    .catch(() => { /* API not running: keep the button hidden */ });
 
   runBtn?.addEventListener('click', async () => {
     if (!runBtn || runBtn.disabled) return;

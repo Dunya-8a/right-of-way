@@ -7,7 +7,11 @@
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #050510; }
-    body { font-family: 'Courier New', Courier, monospace; color: #fff; }
+    body {
+      font-family: ui-monospace, 'SF Mono', Menlo, Monaco, 'Cascadia Mono',
+                   'Courier New', monospace;
+      color: #fff;
+    }
 
     /* Stacking: canvas (0) < 3D labels (1) < header/panels (10) < captions (50)
        < outcome card (100). CSS2D labels get inline z-indexes from three.js,
@@ -65,7 +69,7 @@
     #log-panel {
       position: absolute; top: 82px; right: 28px;
       z-index: 10;
-      width: 420px;
+      width: 470px;
       background: rgba(5,5,16,0.9);
       border: 1px solid rgba(0,212,255,0.22);
       border-radius: 4px;
@@ -95,7 +99,7 @@
 
     /* system lines: detections, burns, verdicts — centered dividers */
     .log-entry {
-      font-size: 11px; padding: 4px 10px;
+      font-size: 12.5px; padding: 4px 10px;
       line-height: 1.5; letter-spacing: 0.08em;
       text-align: center; align-self: center;
       max-width: 100%;
@@ -110,6 +114,31 @@
     body.clean #drop-hint,
     body.clean #controls { display: none; }
     body.clean #caption { bottom: 64px; }
+    body.clean #legend { bottom: 20px; }
+
+    /* ── Legend — what the colors mean, for first-time viewers ───────────── */
+    #legend {
+      position: absolute; left: 28px; bottom: 92px;
+      z-index: 10;
+      display: flex; flex-direction: column; gap: 5px;
+      font-size: 11.5px; letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.55);
+      pointer-events: none;
+    }
+    #legend span { display: flex; align-items: center; gap: 8px; }
+    #legend i {
+      display: inline-block; flex-shrink: 0; font-style: normal;
+    }
+    #legend .sw-dot   { width: 9px; height: 9px; border-radius: 50%; }
+    #legend .sw-red   { background: #ff3b3b; box-shadow: 0 0 6px #ff3b3b; }
+    #legend .sw-green { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+    #legend .sw-line  { width: 18px; height: 2px; background: #ff5555; }
+    #legend .sw-arrow {
+      width: 0; height: 0;
+      border-left: 12px solid #ffaa00;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+    }
 
     .log-entry.referee {
       color: #cfeaff;
@@ -142,16 +171,16 @@
       .comms-bubble { animation: none; }
     }
     .comms-route {
-      font-size: 10px; letter-spacing: 0.14em;
-      margin-bottom: 4px;
+      font-size: 11.5px; letter-spacing: 0.14em;
+      margin-bottom: 5px;
       display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
     }
     .comms-from { color: var(--sat-color, #00d4ff); font-weight: bold; }
     .comms-to   { color: rgba(255,255,255,0.4); }
     .comms-kind {
       margin-left: auto;
-      font-size: 9px; letter-spacing: 0.12em;
-      padding: 1px 6px; border-radius: 3px;
+      font-size: 10.5px; letter-spacing: 0.12em;
+      padding: 1px 7px; border-radius: 3px;
       border: 1px solid currentColor;
     }
     .comms-kind.k-cannot  { color: #ff6b6b; }
@@ -161,14 +190,14 @@
     .comms-kind.k-accept  { color: #3ddc97; }
     .comms-kind.k-directive { color: #9fb4c7; }
     .comms-text {
-      font-size: 11.5px; line-height: 1.55;
-      color: rgba(228,240,250,0.88);
+      font-size: 13.5px; line-height: 1.55;
+      color: rgba(228,240,250,0.9);
       letter-spacing: 0.01em;
     }
     .comms-rounds {
       margin-top: 5px;
-      font-size: 9px; letter-spacing: 0.14em;
-      color: rgba(255,255,255,0.35);
+      font-size: 10px; letter-spacing: 0.14em;
+      color: rgba(255,255,255,0.4);
     }
 
     /* ── Story captions — cinematic lower-third ──────────────────────────── */
@@ -184,14 +213,14 @@
     }
     #caption.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
     #caption-headline {
-      font-size: 21px; letter-spacing: 0.3em; font-weight: bold;
+      font-size: 27px; letter-spacing: 0.28em; font-weight: bold;
       color: var(--cap-color, #00d4ff);
       text-shadow: 0 0 18px var(--cap-glow, rgba(0,212,255,0.55)),
                    0 2px 10px rgba(0,0,0,0.9);
       margin-bottom: 6px;
     }
     #caption-sub {
-      font-size: 12.5px; letter-spacing: 0.08em; line-height: 1.6;
+      font-size: 15.5px; letter-spacing: 0.06em; line-height: 1.6;
       color: rgba(230,242,252,0.85);
       text-shadow: 0 1px 8px rgba(0,0,0,0.95);
     }
@@ -417,6 +446,11 @@
       text-shadow: 0 0 7px rgba(0,212,255,0.9);
       white-space: nowrap; pointer-events: none;
     }
+    .conj-label.clearing {
+      color: #ffb03a;
+      font-size: 14px;
+      text-shadow: 0 0 10px rgba(255,176,58,0.8);
+    }
     .conj-label {
       color: #ff4040;
       font-family: 'Courier New', monospace;
@@ -444,11 +478,11 @@
       <div id="outcome-stats">
         <div class="stat-block">
           <div class="stat-value" id="stat-dv">—</div>
-          <div class="stat-label">TOTAL Δv (m/s)</div>
+          <div class="stat-label">FUEL SPENT (m/s of Δv)</div>
         </div>
         <div class="stat-block">
           <div class="stat-value" id="stat-conjunctions">—</div>
-          <div class="stat-label">CONJUNCTIONS</div>
+          <div class="stat-label">CLOSE CALLS</div>
         </div>
         <div class="stat-block">
           <div class="stat-value" id="stat-maneuvers">—</div>
@@ -474,7 +508,7 @@
   <div id="header">
     <div>
       <div id="title">RIGHT OF WAY</div>
-      <div id="subtitle">Satellites negotiating their own collision avoidance — no one in charge</div>
+      <div id="subtitle">An agent-to-agent right-of-way protocol for physical swarms — demoed in orbit</div>
     </div>
     <div id="drop-hint">DROP TIMELINE JSON TO REPLACE FIXTURE</div>
   </div>
@@ -503,6 +537,13 @@
     <div id="caption-sub"></div>
   </div>
 
+  <div id="legend">
+    <span><i class="sw-dot sw-red"></i> collision risk</span>
+    <span><i class="sw-line"></i> predicted close pass (+ distance)</span>
+    <span><i class="sw-arrow"></i> dodge burn</span>
+    <span><i class="sw-dot sw-green"></i> clear</span>
+  </div>
+
   <div id="controls">
     <button id="play-btn">▶</button>
     <div id="scrubber-wrap">
@@ -510,7 +551,7 @@
       <input type="range" id="scrubber" min="0" max="1000" value="0" step="1" />
     </div>
     <div id="time-display">T+00:00</div>
-    <button id="story-btn" class="on" title="Pause the orbits while each negotiation beat plays out">✦ STORY</button>
+    <button id="story-btn" class="on" title="Story mode: pause the orbits while each negotiation message plays at reading pace">✦ STORY ON</button>
     <select id="speed-select">
       <option value="1">1×</option>
       <option value="5">5×</option>
@@ -518,8 +559,8 @@
       <option value="30" selected>30×</option>
       <option value="60">60×</option>
     </select>
-    <button id="run-btn">▶ RUN</button>
-    <button id="live-btn">🛰 LIVE</button>
+    <button id="run-btn" hidden title="Re-run the simulation live via the local API">▶ RE-SIMULATE</button>
+    <button id="live-btn" title="Load today's real Earth imagery (NASA GIBS) — visual only">🌍 HD EARTH</button>
     <span id="earth-status"></span>
   </div>
 

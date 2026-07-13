@@ -77,7 +77,8 @@ export type TimelineEventType =
   | "maneuver_committed"
   | "resolved"
   | "new_conjunction"
-  | "comms"; // one negotiation message (any kind) — the agents' own words
+  | "comms" // one negotiation message (any kind) — the agents' own words
+  | "safe_pass"; // viz-synthesized: closest approach passed with no collision
 
 export interface TimelineEvent {
   t: number;
