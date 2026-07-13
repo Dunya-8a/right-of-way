@@ -161,7 +161,8 @@
       border: 1px solid rgba(0,212,255,0.22);
       border-radius: 4px;
       display: flex; flex-direction: column;
-      max-height: calc(100vh - 170px);
+      /* leave the bottom-right corner to the legend */
+      max-height: calc(100vh - 290px);
     }
     #log-header {
       padding: 8px 14px; font-size: 11px; letter-spacing: 0.2em;
@@ -649,7 +650,10 @@
       <p style="margin-top:16px">Two satellites are about to pass dangerously close.
       <strong>Each has an AI agent. They negotiate who dodges — in plain English — and a
       physics engine referees every deal.</strong> There's no air-traffic control in orbit;
-      in real life this is coordinated by <em>email</em>. Press ▶ to watch.</p>
+      in real life this is coordinated by
+      <a href="https://www.esa.int/Space_Safety/ESA_spacecraft_dodges_large_constellation"
+         target="_blank" rel="noopener" style="color:#ffcc66">email</a>
+      (ESA vs Starlink-44, Sept 2019). Press ▶ to watch.</p>
 
       <details>
         <summary>WAIT — SATELLITES HAVE FUEL?</summary>
