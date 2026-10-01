@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Close Call — director’s cut</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #050510; }
+    body {
+      font-family: ui-monospace, 'SF Mono', Menlo, Monaco, 'Cascadia Mono',
+                   'Courier New', monospace;
+      color: #fff;
+    }
+
+    /* Stacking: canvas (0) < 3D labels (1) < header/panels (10) < captions (50)
+       < outcome card (100). CSS2D labels get inline z-indexes from three.js,
+       but those only compete INSIDE #label-root — panels always win. */
+    #canvas { display: block; position: absolute; top: 0; left: 0; }
+    #label-root { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+    #header {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 16px 28px 22px;
+      background: linear-gradient(to bottom, rgba(5,5,16,0.97) 60%, transparent);
+      display: flex; justify-content: space-between; align-items: flex-start;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #title {
+      font-size: 28px; letter-spacing: 0.28em;
+      color: #00d4ff; text-shadow: 0 0 18px #00d4ffaa;
+    }
+    #subtitle {
+      font-size: 12px; letter-spacing: 0.15em;
+      color: rgba(0,212,255,0.5); margin-top: 4px;
+    }
+    #header-right {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+      pointer-events: all;
+    }
+    #info-btn {
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.5);
+      color: #7adfff; padding: 7px 14px;
+      font-family: inherit; font-size: 12.5px; letter-spacing: 0.12em;
+      cursor: pointer; border-radius: 4px;
+      transition: background 0.15s;
+    }
+    #info-btn:hover { background: rgba(0,212,255,0.18); }
+    #drop-hint {
+      font-size: 11px; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.28);
+    }
+
+    /* ── "How it works" overlay ──────────────────────────────────────────── */
+    #info-card {
+      position: absolute; inset: 0;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(5,5,16,0.8);
+      z-index: 200;
+    }
+    #info-card.visible { display: flex; }
+    #info-inner {
+      background: rgba(7,14,26,0.98);
+      border: 1px solid rgba(0,212,255,0.35);
+      border-radius: 8px;
+      width: min(720px, 92vw);
+      max-height: 86vh; overflow-y: auto;
+      padding: 30px 38px 26px;
+      font-size: 14px; line-height: 1.65;
+      color: rgba(228,240,250,0.92);
+    }
+    #info-inner::-webkit-scrollbar { width: 5px; }
+    #info-inner::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.3); border-radius: 3px; }
+    #info-inner h1 {
+      font-size: 19px; letter-spacing: 0.22em; color: #00d4ff;
+      margin-bottom: 4px;
+    }
+    #info-inner h2 {
+      font-size: 13px; letter-spacing: 0.2em; color: #7adfff;
+      margin: 22px 0 8px;
+      border-bottom: 1px solid rgba(0,212,255,0.18);
+      padding-bottom: 5px;
+    }
+    #info-inner details {
+      border: 1px solid rgba(0,212,255,0.18);
+      border-radius: 5px;
+      margin: 8px 0;
+      padding: 0 14px;
+    }
+    #info-inner details[open] { padding-bottom: 10px; background: rgba(0,212,255,0.03); }
+    #info-inner summary {
+      cursor: pointer; list-style: none;
+      font-size: 12.5px; letter-spacing: 0.16em; color: #7adfff;
+      padding: 10px 0;
+      display: flex; align-items: center; gap: 10px;
+    }
+    #info-inner summary::before { content: '▸'; transition: transform 0.15s; }
+    #info-inner details[open] summary::before { transform: rotate(90deg); }
+    #info-inner details p { font-size: 13.5px; }
+    #info-close {
+      position: absolute; top: 14px; right: 16px;
+      background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.5); font-size: 20px; font-family: inherit;
+      padding: 4px 8px;
+    }
+    #info-close:hover { color: #fff; }
+    #info-inner { position: relative; }
+    #info-inner p { margin-bottom: 10px; }
+    #info-inner em { color: #ffcc66; font-style: normal; }
+    #info-inner strong { color: #fff; }
+    #info-inner a { color: #7adfff; }
+    #info-tagline {
+      font-size: 12px; letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.45); margin-bottom: 6px;
+    }
+    #info-dismiss {
+      display: block; margin: 22px auto 0;
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.6);
+      color: #7adfff;
+      font-family: inherit; font-size: 13px; letter-spacing: 0.15em;
+      padding: 10px 34px; cursor: pointer; border-radius: 4px;
+      transition: background 0.15s;
+    }
+    #info-dismiss:hover { background: rgba(0,212,255,0.22); }
+    body.clean #info-btn { display: none; }
+
+    /* ── Phase badge ─────────────────────────────────────────────────────── */
+    #phase-badge {
+      position: absolute; top: 82px; left: 28px;
+      z-index: 10;
+      padding: 10px 20px;
+      background: rgba(5,5,16,0.9);
+      border: 1px solid rgba(0,255,136,0.4);
+      border-radius: 4px;
+      display: flex; align-items: center; gap: 12px;
+      transition: border-color 0.3s;
+    }
+    #phase-dot {
+      width: 13px; height: 13px; border-radius: 50%;
+      background: #00ff88; box-shadow: 0 0 12px #00ff88;
+      flex-shrink: 0; transition: background 0.3s, box-shadow 0.3s;
+    }
+    #phase-text {
+      font-size: 15px; letter-spacing: 0.14em; color: #00ff88;
+      transition: color 0.3s;
+    }
+    #phase-badge.danger { border-color: rgba(255,32,32,0.55); }
+    #phase-badge.danger #phase-dot { background: #ff2020; box-shadow: 0 0 12px #ff2020; }
+    #phase-badge.danger #phase-text { color: #ff5050; }
+
+    /* ── Comms panel — the A2A negotiation channel ───────────────────────── */
+    #log-panel {
+      position: absolute; top: 82px; right: 28px;
+      z-index: 10;
+      width: 470px;
+      background: rgba(5,5,16,0.9);
+      border: 1px solid rgba(0,212,255,0.22);
+      border-radius: 4px;
+      display: flex; flex-direction: column;
+      /* leave the bottom-right corner to the legend */
+      max-height: calc(100vh - 290px);
+    }
+    #log-header {
+      padding: 8px 14px; font-size: 11px; letter-spacing: 0.2em;
+      color: rgba(0,212,255,0.5);
+      border-bottom: 1px solid rgba(0,212,255,0.15);
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 8px;
+    }
+    #log-header::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: #00d4ff; box-shadow: 0 0 8px #00d4ff;
+      animation: comms-pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes comms-pulse { 0%,100% { opacity: .35 } 50% { opacity: 1 } }
+    #event-log {
+      padding: 10px; overflow-y: auto; flex: 1;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    #event-log::-webkit-scrollbar { width: 4px; }
+    #event-log::-webkit-scrollbar-track { background: transparent; }
+    #event-log::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.25); border-radius: 2px; }
+
+    /* system lines: detections, burns, verdicts — centered dividers */
+    .log-entry {
+      font-size: 12.5px; padding: 4px 10px;
+      line-height: 1.5; letter-spacing: 0.08em;
+      text-align: center; align-self: center;
+      max-width: 100%;
+    }
+    .log-entry.safe    { color: #66ffb0; }
+    .log-entry.danger  { color: #ff7070; }
+    .log-entry.proposal{ color: #ffcc66; }
+    .log-entry.maneuver{ color: #ffa060; }
+    .log-entry.info    { color: rgba(255,255,255,0.4); }
+    /* ?clean — recording mode: just the globe, the comms, and the captions */
+    body.clean #live-sats-panel,
+    body.clean #drop-hint,
+    body.clean #controls { display: none; }
+    body.clean #caption { bottom: 64px; }
+    body.clean #legend { bottom: 20px; }
+
+    /* ── Legend — what the colors mean, for first-time viewers ───────────── */
+    /* Bottom-right, under the comms panel: the caption lane (center-left)
+       stays clear of it at any width. */
+    #legend {
+      position: absolute; right: 28px; bottom: 92px;
+      z-index: 10;
+      display: flex; flex-direction: column; gap: 5px;
+      align-items: flex-end;
+      font-size: 11.5px; letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.55);
+      pointer-events: none;
+    }
+    #legend span { display: flex; align-items: center; gap: 8px; }
+    #legend i {
+      display: inline-block; flex-shrink: 0; font-style: normal;
+    }
+    #legend .sw-dot   { width: 9px; height: 9px; border-radius: 50%; }
+    #legend .sw-red   { background: #ff3b3b; box-shadow: 0 0 6px #ff3b3b; }
+    #legend .sw-green { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+    #legend .sw-line  { width: 18px; height: 2px; background: #ff5555; }
+    #legend .sw-arrow {
+      width: 0; height: 0;
+      border-left: 12px solid #ffaa00;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+    }
+
+    .log-entry.referee {
+      color: #cfeaff;
+      border: 1px dashed rgba(159,216,255,0.45);
+      border-radius: 4px;
+      background: rgba(159,216,255,0.06);
+      padding: 6px 12px;
+    }
+
+    /* comms bubbles: one satellite speaking to another */
+    .comms-bubble {
+      max-width: 88%;
+      padding: 8px 12px 9px;
+      border-radius: 8px;
+      background: rgba(12,26,44,0.92);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-left: 2px solid var(--sat-color, #00d4ff);
+      animation: bubble-in 0.35s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .comms-bubble.right {
+      align-self: flex-end;
+      border-left: 1px solid rgba(255,255,255,0.09);
+      border-right: 2px solid var(--sat-color, #00d4ff);
+    }
+    @keyframes bubble-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .comms-bubble { animation: none; }
+    }
+    .comms-route {
+      font-size: 11.5px; letter-spacing: 0.14em;
+      margin-bottom: 5px;
+      display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+    }
+    .comms-from { color: var(--sat-color, #00d4ff); font-weight: bold; }
+    .comms-to   { color: rgba(255,255,255,0.4); }
+    .comms-kind {
+      margin-left: auto;
+      font-size: 10.5px; letter-spacing: 0.12em;
+      padding: 1px 7px; border-radius: 3px;
+      border: 1px solid currentColor;
+    }
+    .comms-kind.k-cannot  { color: #ff6b6b; }
+    .comms-kind.k-assert  { color: #58c7ff; }
+    .comms-kind.k-concede { color: #ffb03a; }
+    .comms-kind.k-propose { color: #ffcc66; }
+    .comms-kind.k-accept  { color: #3ddc97; }
+    .comms-kind.k-directive { color: #9fb4c7; }
+    .comms-text {
+      font-size: 13.5px; line-height: 1.55;
+      color: rgba(228,240,250,0.9);
+      letter-spacing: 0.01em;
+    }
+    .comms-rounds {
+      margin-top: 5px;
+      font-size: 10px; letter-spacing: 0.14em;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── Story captions — cinematic lower-third ──────────────────────────── */
+    #caption {
+      /* centered in the space LEFT of the comms panel (420px + margins) so
+         captions never run under the negotiation */
+      position: absolute; left: calc((100vw - 476px) / 2); bottom: 110px;
+      transform: translateX(-50%) translateY(10px);
+      text-align: center; pointer-events: none;
+      opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
+      max-width: min(640px, calc(100vw - 520px));
+      z-index: 50;
+    }
+    #caption.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #caption-headline {
+      font-size: 27px; letter-spacing: 0.28em; font-weight: bold;
+      color: var(--cap-color, #00d4ff);
+      text-shadow: 0 0 18px var(--cap-glow, rgba(0,212,255,0.55)),
+                   0 2px 10px rgba(0,0,0,0.9);
+      margin-bottom: 6px;
+    }
+    #caption-sub {
+      font-size: 15.5px; letter-spacing: 0.06em; line-height: 1.6;
+      color: rgba(230,242,252,0.85);
+      text-shadow: 0 1px 8px rgba(0,0,0,0.95);
+    }
+
+    /* ── Bottom controls ─────────────────────────────────────────────────── */
+    #controls {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      z-index: 10;
+      padding: 16px 28px 20px;
+      background: linear-gradient(to top, rgba(5,5,16,0.97) 60%, transparent);
+      display: flex; align-items: center; gap: 16px;
+    }
+    #play-btn {
+      background: none;
+      border: 1px solid #00d4ff;
+      color: #00d4ff;
+      font-size: 20px; line-height: 1;
+      width: 46px; height: 46px;
+      cursor: pointer; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background 0.15s;
+    }
+    #play-btn:hover { background: rgba(0,212,255,0.14); }
+
+    /* Scrubber wrapper holds the range input + event tick marks */
+    #scrubber-wrap {
+      flex: 1; position: relative;
+      display: flex; align-items: center;
+      height: 24px;
+    }
+    #scrubber {
+      width: 100%; -webkit-appearance: none;
+      height: 3px; background: rgba(0,212,255,0.18);
+      border-radius: 2px; outline: none; cursor: pointer;
+      position: relative; z-index: 2;
+    }
+    #scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      background: #00d4ff; border-radius: 50%;
+      box-shadow: 0 0 8px #00d4ff;
+      position: relative; z-index: 3;
+    }
+    /* Event tick marks overlay */
+    #event-marks {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none; z-index: 1;
+    }
+    .ev-mark {
+      position: absolute; top: 50%;
+      width: 8px; height: 8px; border-radius: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.85;
+    }
+    .ev-mark.danger   { background: #ff2020; box-shadow: 0 0 5px #ff2020; }
+    .ev-mark.proposal { background: #ffaa00; box-shadow: 0 0 5px #ffaa00; }
+    .ev-mark.maneuver { background: #ff6600; box-shadow: 0 0 5px #ff6600; }
+    .ev-mark.safe     { background: #00ff88; box-shadow: 0 0 5px #00ff88; }
+
+    #time-display {
+      font-size: 14px; color: #00d4ff;
+      letter-spacing: 0.08em; min-width: 80px; text-align: right;
+    }
+    #speed-select {
+      background: rgba(0,15,30,0.9);
+      border: 1px solid rgba(0,212,255,0.35);
+      color: #00d4ff; padding: 6px 10px;
+      font-family: inherit; font-size: 13px;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
+    }
+    #story-btn {
+      background: none;
+      border: 1px solid rgba(159,216,255,0.35);
+      color: rgba(159,216,255,0.45); padding: 6px 12px;
+      font-family: inherit; font-size: 12px; letter-spacing: 0.1em;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    #story-btn.on {
+      border-color: rgba(159,216,255,0.8);
+      color: #9fd8ff;
+      box-shadow: 0 0 10px rgba(159,216,255,0.25);
+    }
+    #live-btn {
+      background: none;
+      border: 1px solid rgba(0,255,136,0.5);
+      color: #00ff88; padding: 6px 12px;
+      font-family: inherit; font-size: 12px; letter-spacing: 0.1em;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #live-btn:hover { background: rgba(0,255,136,0.12); }
+    #run-btn {
+      background: none;
+      border: 1px solid rgba(255,170,0,0.6);
+      color: #ffaa00; padding: 6px 14px;
+      font-family: inherit; font-size: 12px; letter-spacing: 0.1em;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    #run-btn:hover:not(:disabled) { background: rgba(255,170,0,0.12); }
+    #run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    #earth-status {
+      font-size: 10px; letter-spacing: 0.08em;
+      color: rgba(0,255,136,0.6); min-width: 120px;
+      flex-shrink: 0;
+    }
+
+    /* ── Outcome card ────────────────────────────────────────────────────── */
+    #outcome-card {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(5,5,16,0.72);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease;
+      z-index: 100;
+    }
+    #outcome-card.visible {
+      opacity: 1; pointer-events: all;
+    }
+    #outcome-inner {
+      background: rgba(5,5,16,0.97);
+      border: 1px solid rgba(0,255,136,0.4);
+      border-radius: 6px;
+      padding: 36px 48px;
+      min-width: 420px;
+      transform: translateY(24px);
+      transition: transform 0.45s cubic-bezier(0.16,1,0.3,1);
+      text-align: center;
+    }
+    #outcome-card.visible #outcome-inner { transform: translateY(0); }
+    #outcome-card.failed #outcome-inner { border-color: rgba(255,32,32,0.4); }
+
+    #outcome-headline {
+      font-size: 32px; letter-spacing: 0.3em;
+      color: #00ff88; text-shadow: 0 0 24px #00ff8888;
+      margin-bottom: 6px;
+    }
+    #outcome-card.failed #outcome-headline { color: #ff4040; text-shadow: 0 0 24px #ff202088; }
+    #outcome-scenario {
+      font-size: 11px; letter-spacing: 0.18em;
+      color: rgba(255,255,255,0.35); margin-bottom: 32px;
+    }
+    #outcome-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px 32px; margin-bottom: 32px;
+    }
+    .stat-block { display: flex; flex-direction: column; gap: 4px; }
+    .stat-value {
+      font-size: 26px; letter-spacing: 0.06em; color: #fff;
+      text-shadow: 0 0 12px rgba(255,255,255,0.2);
+    }
+    .stat-label {
+      font-size: 10px; letter-spacing: 0.18em;
+      color: rgba(0,212,255,0.55);
+    }
+    #outcome-dismiss {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.45);
+      font-family: inherit; font-size: 11px; letter-spacing: 0.15em;
+      padding: 8px 24px; cursor: pointer; border-radius: 3px;
+      transition: all 0.15s;
+    }
+    #outcome-dismiss:hover {
+      border-color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.85);
+    }
+
+    /* ── Live satellite panel ────────────────────────────────────────────── */
+    #live-sats-panel {
+      position: absolute; top: 148px; left: 28px;
+      z-index: 10;
+      background: rgba(5,5,16,0.9);
+      border: 1px solid rgba(0,212,255,0.22);
+      border-radius: 4px;
+      padding: 8px 10px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    #live-sats-header {
+      font-size: 10px; letter-spacing: 0.2em;
+      color: rgba(0,212,255,0.5); margin-bottom: 2px;
+    }
+    .sat-group-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.45);
+      font-family: inherit; font-size: 11px; letter-spacing: 0.1em;
+      padding: 5px 10px; cursor: pointer; border-radius: 3px;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 14px; transition: all 0.15s; text-align: left;
+    }
+    .sat-group-btn .btn-count {
+      font-size: 10px; opacity: 0.6;
+    }
+    .sat-group-btn:hover { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.7); }
+    .sat-group-btn.active { border-color: currentColor; color: var(--group-color); }
+    .sat-group-btn.loading { opacity: 0.5; pointer-events: none; }
+
+    /* ── CSS2D labels (projector-sized) ─────────────────────────────────── */
+    .live-label {
+      color: rgba(255,255,255,0.7);
+      font-family: 'Courier New', monospace;
+      font-size: 11px; letter-spacing: 0.06em;
+      text-shadow: 0 0 6px rgba(255,255,255,0.5);
+      white-space: nowrap; pointer-events: none;
+    }
+    .live-label-picked {
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      font-size: 13px; font-weight: bold; letter-spacing: 0.08em;
+      text-shadow: 0 0 10px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.4);
+      white-space: nowrap; pointer-events: none;
+      padding: 3px 7px;
+      background: rgba(5,5,16,0.75);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 3px;
+    }
+    .sat-label {
+      color: rgba(0,212,255,0.85);
+      font-family: 'Courier New', monospace;
+      font-size: 13px; letter-spacing: 0.07em;
+      text-shadow: 0 0 7px rgba(0,212,255,0.9);
+      white-space: nowrap; pointer-events: none;
+    }
+    .burn-label {
+      color: #ffcc66;
+      font-size: 13px; letter-spacing: 0.04em;
+      white-space: nowrap; pointer-events: none;
+      background: rgba(5,5,16,0.78);
+      border: 1px solid rgba(255,170,0,0.45);
+      border-radius: 3px;
+      padding: 3px 9px;
+      text-shadow: 0 0 8px rgba(255,170,0,0.5);
+    }
+    .conj-label.clearing {
+      color: #ffb03a;
+      font-size: 14px;
+      text-shadow: 0 0 10px rgba(255,176,58,0.8);
+    }
+    .conj-label {
+      color: #ff4040;
+      font-family: 'Courier New', monospace;
+      font-size: 18px; font-weight: bold; letter-spacing: 0.1em;
+      text-shadow: 0 0 12px #ff2020, 0 0 28px #ff202055;
+      white-space: nowrap; pointer-events: none;
+    }
+    .resolved-label {
+      color: #00ff88;
+      font-family: 'Courier New', monospace;
+      font-size: 16px; font-weight: bold;
+      text-shadow: 0 0 10px #00ff88, 0 0 24px #00ff8855;
+      white-space: nowrap; pointer-events: none;
+    }
+
+    /* ── Header buttons ──────────────────────────────────────────────────── */
+    #header-btns { display: flex; gap: 8px; }
+    .hdr-btn {
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.5);
+      color: #7adfff; padding: 7px 14px;
+      font-family: inherit; font-size: 12.5px; letter-spacing: 0.12em;
+      cursor: pointer; border-radius: 4px;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .hdr-btn:hover { background: rgba(0,212,255,0.18); }
+    .hdr-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .hdr-primary {
+      border-color: rgba(255,176,58,0.75); color: #ffc46b;
+      background: rgba(255,176,58,0.1);
+      box-shadow: 0 0 14px rgba(255,176,58,0.18);
+    }
+    .hdr-primary:hover { background: rgba(255,176,58,0.2); }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #ffc46b; outline-offset: 2px; }
+
+    /* ── Closest-approach chart ──────────────────────────────────────────── */
+    #approach-panel {
+      position: absolute; top: 142px; left: 28px;
+      width: 380px; z-index: 10;
+      background: rgba(5,5,16,0.9);
+      border: 1px solid rgba(0,212,255,0.22);
+      border-radius: 4px;
+      padding: 8px 10px 8px;
+    }
+    #approach-panel[hidden] { display: none; }
+    .panel-head {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+      font-size: 10.5px; letter-spacing: 0.18em; color: rgba(0,212,255,0.6);
+      margin-bottom: 4px;
+    }
+    #approach-readout { color: rgba(230,242,252,0.85); letter-spacing: 0.06em; font-size: 11.5px; }
+    #approach-canvas { display: block; width: 100%; height: 150px; }
+    #approach-legend {
+      display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px;
+      font-size: 10.5px; color: rgba(255,255,255,0.6); letter-spacing: 0.04em;
+    }
+    #approach-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    #approach-legend i { display: inline-block; width: 16px; height: 0; }
+    #live-sats-panel { top: 372px !important; }
+
+    /* ── Sandbox ("your move") ───────────────────────────────────────────── */
+    #sandbox-panel {
+      position: absolute; top: 82px; right: 28px; z-index: 12;
+      width: 470px; max-height: calc(100vh - 170px);
+      display: none; flex-direction: column;
+      background: rgba(6,10,22,0.95);
+      border: 1px solid rgba(255,176,58,0.45);
+      border-radius: 6px;
+      box-shadow: 0 0 40px rgba(255,176,58,0.08);
+    }
+    body.sandbox #sandbox-panel { display: flex; }
+    body.sandbox #log-panel, body.sandbox #legend, body.sandbox #caption, body.sandbox #story-btn, body.sandbox #event-marks { display: none; }
+    .sb-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 14px; font-size: 11.5px; letter-spacing: 0.18em; color: #ffc46b;
+      border-bottom: 1px solid rgba(255,176,58,0.2);
+    }
+    #sb-close {
+      background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6);
+      font-family: inherit; font-size: 10.5px; letter-spacing: 0.12em; padding: 4px 9px;
+      border-radius: 3px; cursor: pointer;
+    }
+    #sb-close:hover { color: #fff; border-color: rgba(255,255,255,0.5); }
+    .sb-body { padding: 10px 16px 14px; overflow-y: auto; }
+    .sb-body::-webkit-scrollbar { width: 4px; }
+    .sb-body::-webkit-scrollbar-thumb { background: rgba(255,176,58,0.3); border-radius: 2px; }
+    #sb-brief p { font-size: 13px; line-height: 1.55; color: rgba(228,240,250,0.88); }
+    #sb-brief b { color: #fff; }
+    .sb-red { color: #ff6b74; }
+    .sb-green { color: #3ddc97; }
+    .sb-dim { color: rgba(255,255,255,0.45); }
+    .sb-label {
+      margin: 13px 0 6px; font-size: 10.5px; letter-spacing: 0.2em; color: rgba(255,196,107,0.85);
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    }
+    .sb-val { color: rgba(230,242,252,0.85); letter-spacing: 0.05em; font-size: 11.5px; }
+    .sb-hint { color: rgba(255,255,255,0.38); letter-spacing: 0.04em; font-size: 10.5px; }
+    #sb-movers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .sb-mover {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(230,242,252,0.8); font-family: inherit; text-align: left;
+      padding: 8px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+    }
+    .sb-mover:hover { border-color: rgba(255,196,107,0.5); }
+    .sb-mover.on { border-color: #ffc46b; background: rgba(255,176,58,0.12); box-shadow: 0 0 12px rgba(255,176,58,0.15); }
+    .sb-mover-name { font-size: 13px; letter-spacing: 0.08em; color: #fff; }
+    .sb-mover-meta { font-size: 10.5px; color: rgba(255,255,255,0.5); letter-spacing: 0.04em; }
+    .sb-range { width: 100%; accent-color: #ffb03a; cursor: pointer; }
+    .sb-axis {
+      display: grid; grid-template-columns: 74px 1fr 64px 44px; align-items: center; gap: 8px;
+      font-size: 11px; color: rgba(255,255,255,0.5); margin: 2px 0;
+    }
+    .sb-ax-l { text-align: right; }
+    .sb-num { text-align: right; color: #ffc46b; font-size: 12px; }
+    .sb-centered {
+      -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px;
+      background: linear-gradient(90deg, rgba(255,176,58,0.25), rgba(255,255,255,0.12) 49.5%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.12) 50.5%, rgba(255,176,58,0.25));
+    }
+    .sb-centered::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+      background: #ffb03a; box-shadow: 0 0 8px rgba(255,176,58,0.8);
+    }
+    .sb-centered::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%; background: #ffb03a; }
+    .sb-fuel { margin-top: 12px; font-size: 11.5px; letter-spacing: 0.08em; color: rgba(230,242,252,0.8); }
+    .sb-fuel b { color: #ffc46b; }
+    .sb-fuel-track { margin-top: 5px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    #sb-fuel-bar { height: 100%; width: 0; background: linear-gradient(90deg, #ffb03a, #ffd28a); transition: width 0.15s; }
+    #sb-fuel-bar.over { background: #ff4d5e; }
+    .sb-result { display: grid; grid-template-columns: 170px 1fr; gap: 12px; margin-top: 14px; align-items: center; }
+    #sb-bullseye { width: 170px; height: 170px; display: block; }
+    .sb-verdict { font-size: 13.5px; letter-spacing: 0.1em; font-weight: bold; margin-bottom: 6px; }
+    .sb-verdict.v-clear { color: #3ddc97; text-shadow: 0 0 14px rgba(61,220,151,0.5); }
+    .sb-verdict.v-new { color: #ffb03a; }
+    .sb-verdict.v-collide, .sb-verdict.v-fuel, .sb-verdict.v-none { color: #ff6b74; }
+    #sb-verdict-sub { font-size: 12px; line-height: 1.5; color: rgba(228,240,250,0.8); }
+    #sb-score { margin-top: 8px; font-size: 11.5px; line-height: 1.5; color: rgba(228,240,250,0.75); }
+    #sb-score b { color: #fff; }
+    #sb-tip {
+      margin-top: 10px; font-size: 11.5px; line-height: 1.5; color: rgba(159,216,255,0.8);
+      border-left: 2px solid rgba(159,216,255,0.4); padding-left: 9px;
+    }
+    .sb-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .sb-actions button {
+      background: none; border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.7);
+      font-family: inherit; font-size: 11px; letter-spacing: 0.12em; padding: 7px 11px;
+      border-radius: 3px; cursor: pointer; transition: all 0.15s;
+    }
+    .sb-actions button:hover { border-color: rgba(255,255,255,0.55); color: #fff; }
+    .sb-actions .sb-primary { border-color: #3ddc97; color: #3ddc97; background: rgba(61,220,151,0.08); }
+    .sb-actions .sb-primary:hover { background: rgba(61,220,151,0.18); color: #3ddc97; }
+
+    /* ── Mission launcher ────────────────────────────────────────────────── */
+    #launcher {
+      position: absolute; inset: 0; z-index: 150;
+      display: none; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 40%, rgba(5,5,16,0.55), rgba(5,5,16,0.92));
+      backdrop-filter: blur(2px);
+    }
+    #launcher.visible { display: flex; animation: launcher-in 0.5s ease both; }
+    @keyframes launcher-in { from { opacity: 0; } to { opacity: 1; } }
+    #launcher-inner { position: relative; width: min(1080px, 94vw); max-height: 92vh; overflow-y: auto; padding: 8px 4px; }
+    #launcher-close {
+      position: absolute; top: 0; right: 4px; background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.5); font-size: 20px; font-family: inherit; padding: 4px 8px;
+    }
+    #launcher-close:hover { color: #fff; }
+    #launcher-title {
+      font-size: 34px; letter-spacing: 0.32em; color: #00d4ff;
+      text-shadow: 0 0 22px rgba(0,212,255,0.6);
+    }
+    #launcher-lede {
+      margin: 12px 0 22px; max-width: 760px;
+      font-size: 15px; line-height: 1.65; color: rgba(228,240,250,0.85);
+    }
+    #launcher-lede b { color: #fff; font-weight: normal; border-bottom: 1px solid rgba(255,204,102,0.6); }
+    #mission-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .mission {
+      background: rgba(7,14,26,0.92);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-top: 2px solid var(--m-color);
+      border-radius: 6px; padding: 16px 18px 14px;
+      display: flex; flex-direction: column; gap: 8px;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    }
+    .mission:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.5), 0 0 0 1px var(--m-color) inset; }
+    .mission-kicker { font-size: 10.5px; letter-spacing: 0.22em; color: var(--m-color); }
+    .mission-title { font-size: 20px; letter-spacing: 0.06em; color: #fff; }
+    .mission-body { font-size: 13px; line-height: 1.55; color: rgba(228,240,250,0.75); flex: 1; }
+    .mission-stats { font-size: 11.5px; color: rgba(255,255,255,0.5); letter-spacing: 0.03em; }
+    .mission-stats b { color: rgba(255,255,255,0.85); font-weight: normal; }
+    .mission-best { font-size: 11px; color: #ffc46b; letter-spacing: 0.06em; }
+    .mission-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .mission-actions button {
+      flex: 1; font-family: inherit; font-size: 11.5px; letter-spacing: 0.12em;
+      padding: 9px 10px; border-radius: 4px; cursor: pointer; transition: background 0.15s;
+    }
+    .m-watch { background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.55); color: #7adfff; }
+    .m-watch:hover { background: rgba(0,212,255,0.2); }
+    .m-try { background: rgba(255,176,58,0.08); border: 1px solid rgba(255,176,58,0.6); color: #ffc46b; }
+    .m-try:hover { background: rgba(255,176,58,0.2); }
+    #launcher-foot {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      margin-top: 18px; font-size: 11.5px; color: rgba(255,255,255,0.45); line-height: 1.5;
+    }
+    #launcher-howto {
+      background: none; border: 1px solid rgba(0,212,255,0.4); color: #7adfff;
+      font-family: inherit; font-size: 11.5px; letter-spacing: 0.12em; padding: 8px 14px;
+      border-radius: 4px; cursor: pointer;
+    }
+    #launcher-howto:hover { background: rgba(0,212,255,0.12); }
+    #info-card { z-index: 220; }
+
+    /* outcome actions */
+    #outcome-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    #outcome-try {
+      background: rgba(255,176,58,0.12); border: 1px solid #ffb03a; color: #ffc46b;
+      font-family: inherit; font-size: 12px; letter-spacing: 0.14em; padding: 9px 18px;
+      border-radius: 3px; cursor: pointer;
+    }
+    #outcome-try:hover { background: rgba(255,176,58,0.24); }
+    #outcome-missions {
+      background: none; border: 1px solid rgba(0,212,255,0.45); color: #7adfff;
+      font-family: inherit; font-size: 11px; letter-spacing: 0.15em; padding: 8px 16px;
+      border-radius: 3px; cursor: pointer;
+    }
+    #outcome-missions:hover { background: rgba(0,212,255,0.12); }
+
+    /* ── Narrow screens ──────────────────────────────────────────────────── */
+    @media (max-width: 1100px) {
+      #live-sats-panel, #legend, #drop-hint, #earth-status { display: none !important; }
+      #log-panel, #sandbox-panel { width: 400px; }
+      #caption { left: calc((100vw - 420px) / 2); max-width: calc(100vw - 460px); }
+    }
+    @media (max-width: 820px) {
+      #header { padding: 12px 16px 16px; flex-direction: column; gap: 8px; }
+      #title { font-size: 20px; }
+      #subtitle { display: none; }
+      #header-right { align-items: flex-start; }
+      .hdr-btn { padding: 6px 8px; font-size: 10.5px; letter-spacing: 0.06em; white-space: nowrap; }
+      #phase-badge { top: 92px; left: 16px; padding: 6px 12px; }
+      #phase-text { font-size: 12px; }
+      #approach-panel { top: 132px; left: 16px; right: 16px; width: auto; }
+      #approach-canvas { height: 110px; }
+      #log-panel, #sandbox-panel {
+        top: auto; bottom: 74px; left: 16px; right: 16px; width: auto;
+        max-height: 38vh;
+      }
+      #caption { display: none; }
+      #controls { padding: 10px 16px 14px; gap: 8px; }
+      #live-btn, #story-btn { display: none; }
+      #mission-grid { grid-template-columns: 1fr; }
+      #launcher-title { font-size: 24px; }
+      .sb-result { grid-template-columns: 1fr; justify-items: center; }
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/replay-C9r4VW8T.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/orbit-B_ergMA8.js">
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="label-root"></div>
+
+  <div id="outcome-card">
+    <div id="outcome-inner">
+      <div id="outcome-headline">RESOLVED</div>
+      <div id="outcome-scenario"></div>
+      <div id="outcome-stats">
+        <div class="stat-block">
+          <div class="stat-value" id="stat-dv">—</div>
+          <div class="stat-label">FUEL SPENT (m/s of Δv)</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-conjunctions">—</div>
+          <div class="stat-label">CLOSE CALLS</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-maneuvers">—</div>
+          <div class="stat-label">MANEUVERS</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-rounds">—</div>
+          <div class="stat-label">NEG. ROUNDS</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-time">—</div>
+          <div class="stat-label">TIME TO CLEAR (s)</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-value" id="stat-topology">—</div>
+          <div class="stat-label">TOPOLOGY</div>
+        </div>
+      </div>
+      <div id="outcome-actions">
+        <button id="outcome-try">⚖ THINK YOU CAN DO BETTER? TRY IT</button>
+        <button id="outcome-missions">☰ OTHER MISSIONS</button>
+        <button id="outcome-dismiss">DISMISS</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="header">
+    <div>
+      <div id="title">RIGHT OF WAY</div>
+      <div id="subtitle">An agent-to-agent right-of-way protocol for physical swarms — demoed in orbit</div>
+    </div>
+    <div id="header-right">
+      <div id="header-btns">
+        <button id="missions-btn" class="hdr-btn" title="Pick a scenario">☰ MISSIONS</button>
+        <button id="try-btn" class="hdr-btn hdr-primary" title="Design the dodge yourself — the physics referee judges it live">⚖ YOUR MOVE</button>
+        <button id="info-btn" class="hdr-btn" title="What am I looking at?">ⓘ HOW IT WORKS</button>
+      </div>
+      <div id="drop-hint">DROP A TIMELINE JSON TO PLAY YOUR OWN RUN</div>
+    </div>
+  </div>
+
+  <div id="phase-badge">
+    <div id="phase-dot"></div>
+    <div id="phase-text">ALL CLEAR</div>
+  </div>
+
+  <div id="approach-panel">
+    <div class="panel-head"><span id="approach-title">HOW CLOSE DO THEY GET?</span><span id="approach-readout"></span></div>
+    <canvas id="approach-canvas"></canvas>
+    <div id="approach-legend"></div>
+  </div>
+
+  <div id="sandbox-panel">
+    <div class="sb-head">
+      <span>⚖ YOUR MOVE — YOU'RE THE OPERATOR</span>
+      <button id="sb-close" title="Back to the agents' story">✕ BACK TO STORY</button>
+    </div>
+    <div class="sb-body">
+      <div id="sb-brief"></div>
+
+      <div class="sb-label">WHO BURNS?</div>
+      <div id="sb-movers"></div>
+
+      <div class="sb-label">WHEN? <span id="sb-when-val" class="sb-val"></span></div>
+      <input type="range" id="sb-when" class="sb-range" />
+
+      <div class="sb-label">WHICH WAY? <span class="sb-hint">m/s of push, in the satellite's own frame</span></div>
+      <div class="sb-axis">
+        <span class="sb-ax-l">slow down</span>
+        <input type="range" id="sb-at" class="sb-range sb-centered" min="-30" max="30" step="0.1" value="0" />
+        <span class="sb-ax-r">speed up</span><span id="sb-at-val" class="sb-num"></span>
+      </div>
+      <div class="sb-axis">
+        <span class="sb-ax-l">dip down</span>
+        <input type="range" id="sb-rad" class="sb-range sb-centered" min="-30" max="30" step="0.1" value="0" />
+        <span class="sb-ax-r">climb</span><span id="sb-rad-val" class="sb-num"></span>
+      </div>
+      <div class="sb-axis">
+        <span class="sb-ax-l">left</span>
+        <input type="range" id="sb-crs" class="sb-range sb-centered" min="-30" max="30" step="0.1" value="0" />
+        <span class="sb-ax-r">right</span><span id="sb-crs-val" class="sb-num"></span>
+      </div>
+
+      <div class="sb-fuel">
+        <span>FUEL <b id="sb-dv-total">0.0 m/s</b> <span id="sb-fuel-text" class="sb-dim"></span></span>
+        <div class="sb-fuel-track"><div id="sb-fuel-bar"></div></div>
+      </div>
+
+      <div class="sb-result">
+        <canvas id="sb-bullseye" title="Where the two satellites pass each other at closest approach, viewed along their relative motion"></canvas>
+        <div class="sb-result-text">
+          <div id="sb-verdict" class="sb-verdict"></div>
+          <div id="sb-verdict-sub"></div>
+          <div id="sb-score"></div>
+        </div>
+      </div>
+      <div id="sb-tip"></div>
+      <div class="sb-actions">
+        <button id="sb-fly" class="sb-primary">▶ FLY IT</button>
+        <button id="sb-agents" title="Load the burn the agents agreed on">LOAD AGENTS' BURN</button>
+        <button id="sb-reset">RESET</button>
+        <button id="sb-share">⧉ SHARE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="launcher">
+    <div id="launcher-inner">
+      <button id="launcher-close" title="Close">✕</button>
+      <div id="launcher-title">RIGHT OF WAY</div>
+      <div id="launcher-lede">There is no air-traffic control in orbit. When two satellites from different
+      operators are on a collision course, somebody has to burn fuel to dodge, and nobody wants to.
+      Here <b>AI agents negotiate who moves</b>, in plain English, and a <b>physics engine that can't be
+      talked round</b> judges every deal.</div>
+      <div id="mission-grid"></div>
+      <div id="launcher-foot">
+        <button id="launcher-howto">ⓘ NEW HERE? THE 60-SECOND EXPLAINER</button>
+        <span>Every “your move” verdict is computed live in your browser by a port of the same orbital-mechanics referee the agents answer to.</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="live-sats-panel">
+    <div id="live-sats-header">SCENE LAYERS</div>
+    <button class="sat-group-btn active" id="sim-toggle" style="--group-color:#00d4ff">SIMULATION <span class="btn-count"></span></button>
+    <div style="height:1px;background:rgba(0,212,255,0.15);margin:2px 0"></div>
+    <button class="sat-group-btn" data-group="stations" style="--group-color:#ffffff">STATIONS   <span class="btn-count"></span></button>
+    <button class="sat-group-btn" data-group="starlink" style="--group-color:#5599ff">STARLINK   <span class="btn-count"></span></button>
+    <button class="sat-group-btn" data-group="active"   style="--group-color:#7799aa">ALL ACTIVE <span class="btn-count"></span></button>
+  </div>
+
+  <div id="log-panel">
+    <div id="log-header">SATELLITE COMMS — A2A CHANNEL</div>
+    <div id="event-log"></div>
+  </div>
+
+  <div id="caption">
+    <div id="caption-headline"></div>
+    <div id="caption-sub"></div>
+  </div>
+
+  <div id="info-card">
+    <div id="info-inner">
+      <button id="info-close" title="Close and explore the view">✕</button>
+      <h1>RIGHT OF WAY</h1>
+      <div id="info-tagline">An agent-to-agent right-of-way protocol for physical swarms — demoed in orbit</div>
+
+      <p style="margin-top:16px">Two satellites are about to pass dangerously close.
+      <strong>Each has an AI agent. They negotiate who dodges — in plain English — and a
+      physics engine referees every deal.</strong> There's no air-traffic control in orbit;
+      in real life this is coordinated by
+      <a href="https://www.esa.int/Space_Safety/ESA_spacecraft_dodges_large_constellation"
+         target="_blank" rel="noopener" style="color:#ffcc66">email</a>
+      (ESA vs Starlink-44, Sept 2019). Press ▶ to watch.</p>
+
+      <details>
+        <summary>WAIT — SATELLITES HAVE FUEL?</summary>
+        <p>Yes: a small tank of propellant for tiny thrusters. Firing them is a
+        <em>burn</em>; the lifetime supply is <em>Δv (delta-v)</em>, measured in m/s.
+        Fuel is mission lifetime — every dodge costs months of operational life, which is
+        why nobody <em>wants</em> to move and this is a negotiation, not a calculation.
+        A dead satellite (or an empty tank) physically can't move — someone else must.</p>
+      </details>
+
+      <details>
+        <summary>WHO HAS RIGHT OF WAY?</summary>
+        <p>Honestly: <strong>no agreed standard exists</strong> — that's the gap this
+        project pokes at. The demo models it as a <em>priority number</em> (crewed craft
+        &gt; science mission &gt; constellation sat #4,412 &gt; debris); the norm says the
+        lower priority dodges. The interesting moments are when the norm can't hold — no
+        fuel, or an operator who won't answer — and the agents must talk it out.</p>
+      </details>
+
+      <details>
+        <summary>THE PHYSICS REFEREE</summary>
+        <p>Agents can argue, bargain, even lie — no deal counts until a deterministic
+        orbital-mechanics engine confirms the burn clears the encounter and fits the fuel
+        budget. Every burn triggers a re-scan (a dodge that creates a <em>new</em> near-miss
+        sends everyone back to the table), and claims are audited: say "I can't move" with
+        a full tank, and the deal is voided — the burn lands on <em>you</em>.</p>
+      </details>
+
+      <details>
+        <summary>READING THE SCREEN</summary>
+        <p><span style="color:#ff5555">Red dots + line</span> = the pair at risk and their
+        predicted close pass. <span style="color:#ffaa00">Orange arrow</span> = the dodge
+        burn. <span style="color:#00ff88">Green</span> = safe. <em>STORY</em> pauses the
+        orbits while each message plays. Other runs:
+        <a href="?timeline=liar">the lying satellite</a> ·
+        <a href="?timeline=live">a real conjunction this week</a> ·
+        <a href="?timeline=forced-trade">the synthetic proof</a>.</p>
+      </details>
+
+      <p style="margin-top:14px; font-size:12.5px">MIT ·
+      <a href="https://github.com/Dunya-8a/right-of-way" target="_blank" rel="noopener">github.com/Dunya-8a/right-of-way</a> ·
+      <a href="https://github.com/Dunya-8a/right-of-way/blob/main/PROTOCOL.md" target="_blank" rel="noopener">PROTOCOL.md</a>
+      (the same loop works for drones, ships — any fleet with no central boss)</p>
+
+      <button id="info-dismiss">GOT IT</button>
+    </div>
+  </div>
+
+  <div id="legend">
+    <span><i class="sw-dot sw-red"></i> collision risk</span>
+    <span><i class="sw-line"></i> predicted close pass (+ distance)</span>
+    <span><i class="sw-arrow"></i> dodge burn</span>
+    <span><i class="sw-dot sw-green"></i> clear</span>
+  </div>
+
+  <div id="controls">
+    <button id="play-btn">▶</button>
+    <div id="scrubber-wrap">
+      <div id="event-marks"></div>
+      <input type="range" id="scrubber" min="0" max="1000" value="0" step="1" />
+    </div>
+    <div id="time-display">T+00:00</div>
+    <button id="story-btn" class="on" title="Story mode: pause the orbits while each negotiation message plays at reading pace">✦ STORY ON</button>
+    <select id="speed-select">
+      <option value="1">1×</option>
+      <option value="5">5×</option>
+      <option value="10">10×</option>
+      <option value="30" selected>30×</option>
+      <option value="60">60×</option>
+    </select>
+    <button id="run-btn" hidden title="Re-run the simulation live via the local API">▶ RE-SIMULATE</button>
+    <button id="live-btn" title="Load today's real Earth imagery (NASA GIBS) — visual only">🌍 HD EARTH</button>
+    <span id="earth-status"></span>
+  </div>
+
+</body>
+</html>

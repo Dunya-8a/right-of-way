@@ -1883,7 +1883,7 @@ const runCache = new Map<string, Promise<Timeline>>();
 
 function fetchRun(key: string): Promise<Timeline> {
   if (!runCache.has(key)) {
-    const url = key === 'local' ? './timeline.json' : `./runs/${key}.json`;
+    const url = key === 'local' ? './timeline.json' : `./puzzles/${key}.json`;
     runCache.set(key, fetch(url).then(r => {
       if (!r.ok) throw new Error(`${url}: ${r.status}`);
       return r.json() as Promise<Timeline>;

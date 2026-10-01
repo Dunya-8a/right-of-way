@@ -1,0 +1,40 @@
+# Builds today's Close Call puzzle from a real CelesTrak SOCRATES conjunction
+# and commits it; the push redeploys the site. Runs on GitHub's servers, so the
+# site itself never hits CelesTrak (its usage policy limits repeat downloads).
+#
+# Secrets: ANTHROPIC_API_KEY (optional — without it, or without credit, the
+# agents run on the offline stand-in brain and the puzzle says so).
+name: Daily Close Call
+
+on:
+  schedule:
+    - cron: "15 6 * * *" # 06:15 UTC, after SOCRATES's overnight update
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-close-call
+  cancel-in-progress: false
+
+jobs:
+  build-puzzle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - name: Build today's puzzle
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv run python tools/daily_close_call.py
+      - name: Commit if there's a new puzzle
+        run: |
+          git add web/public/puzzles
+          if git diff --cached --quiet; then echo "no new puzzle"; exit 0; fi
+          git config user.name "close-call-bot"
+          git config user.email "close-call-bot@users.noreply.github.com"
+          git commit -m "puzzle: daily close call $(date -u +%F)"
+          git push

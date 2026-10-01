@@ -13,6 +13,8 @@ export default defineConfig({
   build: {
     target: 'esnext',
     rollupOptions: {
+      // index.html: the Close Call game; replay.html: the cinematic replay of an AI run
+      input: { main: 'index.html', replay: 'replay.html' },
       external: (id: string) => id.startsWith('#wasm'),
     },
   },

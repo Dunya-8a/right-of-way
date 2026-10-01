@@ -1,0 +1,39 @@
+[
+  {
+    "id": "forced-trade",
+    "kind": "practice",
+    "date": null,
+    "title": "The chain reaction",
+    "file": "forced-trade.json"
+  },
+  {
+    "id": "liar",
+    "kind": "practice",
+    "date": null,
+    "title": "The lying satellite",
+    "file": "liar.json"
+  },
+  {
+    "id": "aeolus",
+    "kind": "classic",
+    "date": "2019-09-02",
+    "title": "Aeolus vs. Starlink-44",
+    "file": "aeolus.json"
+  },
+  {
+    "id": "live",
+    "kind": "daily",
+    "date": "2026-07-13",
+    "title": "STARLINK-3068 vs. VELOX-I",
+    "file": "live.json",
+    "number": 1
+  },
+  {
+    "id": "2026-10-01",
+    "number": 2,
+    "date": "2026-10-01",
+    "kind": "daily",
+    "title": "STARLINK-6110 vs. TRANSPORTER-14 OBJECT E",
+    "file": "2026-10-01.json"
+  }
+]
