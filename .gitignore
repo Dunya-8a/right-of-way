@@ -20,6 +20,7 @@ node_modules/
 
 # WS3 runtime output (the emitted run; sample_timeline.json is the committed fixture)
 web/public/timeline.json
+web/dist/timeline.json
 
 # Playwright (per house rules)
 .playwright-mcp/

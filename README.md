@@ -7,6 +7,19 @@
 
 The comms channel above is the actual model output. AEOLUS holds right-of-way; STARLINK-44's agent explains that its operator "has declined to schedule any burn and is unreachable via the on-call system"; AEOLUS concedes — *"the only responsible action is for me to take the avoidance burn now… accepting the science-time cost to protect this 480 M-euro ESA asset."* Then the physics referee verifies the burn clears, and the sky is provably safe.
 
+## Your move: try to beat the agents
+
+Open the viz, pick a mission, and press **⚖ YOUR MOVE**. You take the operator's seat: choose who burns, when, and which way (speed up/slow down, climb/dip, sideways). A browser port of the same orbital-mechanics referee (`web/src/orbit.ts`, the Python core's universal-variable propagator and screener, which reproduces the recorded runs to 10⁻¹² km) judges every slider move live:
+
+- **REJECTED**: the tank can't cover the burn (try making the dead satellite dodge).
+- **STILL TOO CLOSE**: the encounter is still under the 5 km threshold.
+- **NEW NEAR-MISS**: you cleared the first satellite and set up a crash with another one.
+- **CLEARS**: approved, and your fuel is scored against what the agents spent.
+
+The physics teaches its own lesson: **early burns are cheap.** The agents dodged Aeolus with 23 m/s three minutes out, and the same encounter clears with ~7 m/s ten minutes out. On the live Starlink conjunction it's 45 m/s vs ~5. Every dodge has a shareable link (`?timeline=live&try=STARLINK-3068,180,0,-6,0`).
+
+A **closest-approach chart** runs alongside both modes: the dashed line is the referee's forecast if nobody moves, and the solid line is what actually happened, drawn as time passes. The gap between them is the dodge.
+
 ## Why this is interesting to AI people (not just space people)
 
 Everyone distrusts LLM-as-judge. This is the opposite construction: **LLM agents negotiate a real, adversarial, multi-party decision — and the judge is a deterministic physics engine that cannot be sweet-talked.**
@@ -105,7 +118,7 @@ uv run python -m row.eval --leaderboard      # swarm/hierarchical × mock/claude
 cd web && pnpm install && pnpm dev       # the 3D viz — plays the emitted Timeline in story mode
 ```
 
-The viz opens on the Aeolus re-enactment and narrates it: **story mode** freezes the orbital clock at each negotiation, plays the messages beat-by-beat, and shows the referee verifying every burn. First-time visitors get a "HOW IT WORKS" explainer (what Δv/fuel is, how right-of-way is modeled, what the referee checks). URL params: `?timeline=forced-trade` / `?timeline=liar` / `?timeline=live` (the bundled runs), `?autoplay`, `?clean` (hide the chrome — for recording clips).
+The viz opens on a **mission launcher** with four scenarios. Each one can be watched or played. **Story mode** freezes the orbital clock at each negotiation, plays the messages beat by beat, and shows the referee verifying every burn. **Your move** hands you the controls (see above). "HOW IT WORKS" explains Δv/fuel, right-of-way, and the referee. URL params: `?timeline=aeolus|liar|forced-trade|live` (bundled runs in `web/public/runs/`), `?timeline=local` (whatever `python -m row.orchestrator` last wrote to `web/public/timeline.json`), `?autoplay`, `?try=ID,tBurn,along,radial,cross` (open a shared dodge), and `?clean` (hide the chrome, for recording clips). Space bar plays and pauses.
 
 The viz is a static site — `vercel.json` at the repo root deploys it as-is (import the repo on Vercel, or `npx vercel`); every push to `main` redeploys.
 
@@ -130,7 +143,12 @@ row/
     ├── swarm.py            #   emergent peer-to-peer negotiation, no coordinator
     ├── hierarchical.py     #   central-coordinator fallback
     └── llm.py              #   ClaudeBrain (Sonnet 4.6) + deterministic MockBrain fallback
-web/                        # three.js + Vite 3D orbit viz (story mode, comms channel, captions)
+web/                        # three.js + Vite 3D orbit viz
+├── src/main.ts             #   story mode, comms channel, captions, mission launcher
+├── src/orbit.ts            #   the physics referee, ported to TS (exact two-body + screening)
+├── src/sandbox.ts          #   "your move": design a burn, get a live verdict
+├── src/chart.ts            #   closest-approach chart (log-scale separation vs. time)
+└── public/runs/            #   the bundled agent runs (Timeline JSON)
 ```
 
 > **Built in parallel.** The four workstreams — physics core, MCP server, the Claude-backed A2A agent layer, and the verify-and-repair orchestrator — were developed concurrently in separate git worktrees against locked `pydantic` contracts, then merged to `main`. A multi-agent build process for a multi-agent product.

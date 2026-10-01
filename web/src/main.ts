@@ -2,10 +2,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { LiveSatLayer } from './live-sats.js';
+import { Trajectory, closestApproach, norm, vec, type Burn } from './orbit.js';
+import { ApproachChart, sampleSeparation, type Series } from './chart.js';
+import { Sandbox, type SandboxResult } from './sandbox.js';
 
 // ── Timeline contract (mirrors web/types.ts) ─────────────────────────────────
 type Vec3 = [number, number, number];
-interface FrameObject { id: string; r: Vec3; }
+interface FrameObject { id: string; r: Vec3; v?: Vec3 | null; }
 interface Frame { t: number; objects: FrameObject[]; }
 interface TLEvent { t: number; type: string; data: Record<string, unknown>; }
 interface Timeline { meta: Record<string, unknown>; frames: Frame[]; events: TLEvent[]; }
@@ -444,6 +447,8 @@ function syncConjLabels() {
       scene.add(obj);
       conjMidPts.set(key, obj);
     }
+    const el = obj.element as HTMLElement;
+    if (!el.classList.contains('clearing')) el.textContent = `${c.miss.toFixed(1)} km`;
     obj.position.copy(mid);
   });
 }
@@ -590,6 +595,120 @@ function interpolatePos(frames: Frame[], id: string, t: number): THREE.Vector3 |
   const o1 = frames[hi].objects.find(x => x.id === id);
   if (!o0 || !o1) return null;
   return new THREE.Vector3(...o0.r).lerp(new THREE.Vector3(...o1.r), alpha).multiplyScalar(S);
+}
+
+// Exact positions: the timeline's epoch states + committed burns, propagated
+// by the same two-body core the referee uses. Linear interpolation between
+// 20 s frames cuts ~0.4 km chords off the orbit — the size of the near-miss.
+let trajs = new Map<string, Trajectory>();
+let sandboxTrajs: Map<string, Trajectory> | null = null;
+
+function buildTrajectories(data: Timeline): Map<string, Trajectory> {
+  const out = new Map<string, Trajectory>();
+  const f0 = data.frames[0];
+  if (!f0 || f0.objects.some(o => !o.v)) return out;
+  const burns = new Map<string, Burn[]>();
+  for (const e of data.events) {
+    if (e.type !== 'maneuver_committed') continue;
+    const id = e.data['obj_id'] as string;
+    burns.set(id, [...(burns.get(id) ?? []), { t: e.data['t_burn'] as number, dv: e.data['dv_vector'] as Vec3 }]);
+  }
+  for (const o of f0.objects) out.set(o.id, new Trajectory({ r: o.r, v: o.v as Vec3 }, burns.get(o.id) ?? []));
+  // Trust the propagation only if it reproduces the recorded frames.
+  for (const f of data.frames.filter((_, i) => i % 5 === 0)) {
+    for (const o of f.objects) {
+      const tr = out.get(o.id);
+      if (!tr || norm(vec.sub(tr.stateAt(f.t).r, o.r)) > 0.05) return new Map();
+    }
+  }
+  return out;
+}
+
+function positionAt(id: string, t: number): THREE.Vector3 | null {
+  const tr = (sandboxTrajs ?? trajs).get(id);
+  if (tr) return new THREE.Vector3(...tr.stateAt(t).r).multiplyScalar(S);
+  return tl ? interpolatePos(tl.frames, id, Math.min(Math.max(t, tMin), tMax)) : null;
+}
+
+// ── Closest-approach chart ────────────────────────────────────────────────────
+const approachChart = new ApproachChart(document.getElementById('approach-canvas') as HTMLCanvasElement);
+const approachTitle = document.getElementById('approach-title')!;
+const approachReadout = document.getElementById('approach-readout')!;
+const approachLegend = document.getElementById('approach-legend')!;
+const PAIR_COLORS = ['#58c7ff', '#c792ea', '#ffb03a'];
+let readoutPair: [string, string] | null = null;
+
+function sepFn(a: Trajectory, b: Trajectory) {
+  return (t: number) => norm(vec.sub(a.stateAt(t).r, b.stateAt(t).r));
+}
+
+function legendHtml(items: { color: string; dashed?: boolean; label: string }[]) {
+  return items.map(i =>
+    `<span><i style="border-top:2px ${i.dashed ? 'dashed' : 'solid'} ${i.color}"></i>${i.label}</span>`).join('');
+}
+
+// Story mode: for every pair the referee flags, the forecast at the moment it
+// was flagged (dashed red) vs what actually happened (solid, drawn as time
+// passes). The gap between the two lines is the dodge.
+function buildStoryChart(data: Timeline) {
+  const panel = document.getElementById('approach-panel')!;
+  if (!trajs.size) { panel.hidden = true; return; }
+  panel.hidden = false;
+  const thr = (data.meta['conjunction_threshold_km'] as number) ?? 5;
+  const window = (data.meta['screen_window_s'] as number) ?? 3600;
+  const f0 = data.frames[0];
+  const series: Series[] = [];
+  const legend: { color: string; dashed?: boolean; label: string }[] = [];
+  const seen = new Set<string>();
+  data.events.forEach((e, i) => {
+    if (e.type !== 'conjunction_detected' && e.type !== 'new_conjunction') return;
+    const a = e.data['a_id'] as string, b = e.data['b_id'] as string;
+    if (seen.has(ck(a, b))) return;
+    seen.add(ck(a, b));
+    const before = new Map<string, Burn[]>();
+    for (const m of data.events.slice(0, i)) {
+      if (m.type !== 'maneuver_committed') continue;
+      const id = m.data['obj_id'] as string;
+      before.set(id, [...(before.get(id) ?? []), { t: m.data['t_burn'] as number, dv: m.data['dv_vector'] as Vec3 }]);
+    }
+    const mk = (id: string) => {
+      const o = f0.objects.find(x => x.id === id)!;
+      return new Trajectory({ r: o.r, v: o.v as Vec3 }, before.get(id) ?? []);
+    };
+    const pa = mk(a), pb = mk(b);
+    const pred = closestApproach(pa, pb, e.t, window);
+    const ta = trajs.get(a)!, tb = trajs.get(b)!;
+    const act = closestApproach(ta, tb, Math.max(e.t, tMin), tMax);
+    const color = PAIR_COLORS[series.length / 2 % PAIR_COLORS.length];
+    series.push({
+      key: `${a}:${b}:pred`, color: 'rgba(255,90,100,0.9)', dashed: true,
+      points: sampleSeparation(sepFn(pa, pb), e.t, tMax, [pred.tca]),
+      revealFrom: e.t, minLabel: `${pred.miss.toFixed(2)} km forecast`,
+    });
+    series.push({
+      key: `${a}:${b}:act`, color,
+      points: sampleSeparation(sepFn(ta, tb), tMin, tMax, [act.tca]),
+      revealToCursor: true, width: 2.2,
+      minLabel: act.miss > thr ? `${act.miss.toFixed(1)} km actual ✓` : `${act.miss.toFixed(2)} km actual`,
+      minLabelAfterCursor: true,
+    });
+    legend.push({ color, label: `${a} ↔ ${b}` });
+  });
+  legend.push({ color: 'rgba(255,90,100,0.9)', dashed: true, label: 'forecast if nobody moves' });
+  approachChart.set(series, tMin, tMax, thr);
+  approachLegend.innerHTML = legendHtml(legend);
+  approachTitle.textContent = 'HOW CLOSE DO THEY GET?';
+  const first = data.events.find(e => e.type === 'conjunction_detected');
+  readoutPair = first ? [first.data['a_id'] as string, first.data['b_id'] as string] : null;
+}
+
+function updateReadout(t: number) {
+  if (!readoutPair) { approachReadout.textContent = ''; return; }
+  const src = sandboxTrajs ?? trajs;
+  const a = src.get(readoutPair[0]), b = src.get(readoutPair[1]);
+  if (!a || !b) return;
+  const d = norm(vec.sub(a.stateAt(t).r, b.stateAt(t).r));
+  approachReadout.textContent = `now ${d >= 100 ? Math.round(d).toLocaleString() : d.toFixed(2)} km apart`;
 }
 
 // ── Event processing ──────────────────────────────────────────────────────────
@@ -1117,9 +1236,13 @@ function loadTimeline(data: Timeline) {
       }));
     data.events = [...data.events, ...synth].sort((x, y) => x.t - y.t);
   }
+  if (sandbox.active) exitSandbox(false);
   tl = data;
   tMin = data.frames[0]?.t ?? 0;
   tMax = data.frames.at(-1)?.t ?? 1;
+  trajs = buildTrajectories(data);
+  buildStoryChart(data);
+  document.getElementById('try-btn')!.toggleAttribute('disabled', !trajs.size);
   playTime = tMin;
   playing  = false;
   isResolved = false;
@@ -1185,7 +1308,12 @@ function frame() {
   lastMs = nowMs;
 
   if (tl) {
-    if (playing) {
+    if (playing && sandbox.active) {
+      // sandbox "fly it": plain clock, no story events
+      playTime = Math.min(sbEnd, playTime + (dtMs / 1000) * speed);
+      if (playTime >= sbEnd) { playing = false; updatePlayBtn(); }
+      scrubber.value = String(Math.round(((playTime - tMin) / (sbEnd - tMin)) * 1000));
+    } else if (playing) {
       if (narrating) {
         stepNarration(nowMs); // orbital clock frozen while the story beat plays
       } else {
@@ -1219,9 +1347,11 @@ function frame() {
 
     trailTick++;
     sats.forEach((sat, id) => {
-      const pos = interpolatePos(tl!.frames, id, playTime);
+      const pos = positionAt(id, playTime);
       if (!pos) return;
       sat.mesh.position.copy(pos);
+      // constant-ish screen size: a 100 km sphere shouldn't fill the frame on a close-up
+      sat.mesh.scale.setScalar(THREE.MathUtils.clamp(camera.position.distanceTo(pos) / 2.6, 0.12, 1.2));
       if (trailTick % 3 === 0) pushTrail(sat, pos);
       manArrows.get(id)?.position.copy(pos);
     });
@@ -1229,6 +1359,12 @@ function frame() {
     updateConjLinePositions();
     if (trailTick % 8 === 0) syncConjLabels();
     updateProposal(nowMs);
+    // overlays keep a steady on-screen size through camera close-ups
+    const screenScale = (o: THREE.Object3D) =>
+      o.scale.setScalar(THREE.MathUtils.clamp(camera.position.distanceTo(o.position) / 2.6, 0.15, 1.2));
+    manArrows.forEach(screenScale);
+    if (propPacket) screenScale(propPacket);
+    if (sbArrow) screenScale(sbArrow);
 
     // Color + pulse
     const pulse = 0.45 + 0.55 * Math.sin(nowMs * 0.007);
@@ -1252,7 +1388,9 @@ function frame() {
       }
     });
 
-    if (trailTick % 5 === 0) updatePhaseBadge();
+    if (trailTick % 5 === 0) { if (!sandbox.active) updatePhaseBadge(); updateReadout(playTime); }
+    approachChart.setCursor(playTime);
+    approachChart.render();
     updateTimeDsp();
   }
 
@@ -1314,6 +1452,12 @@ function updateTimeDsp() {
 // ── UI wiring ─────────────────────────────────────────────────────────────────
 playBtn.addEventListener('click', () => {
   if (!tl) return;
+  if (sandbox.active) {
+    if (!playing && playTime >= sbEnd - 1e-6) playTime = tMin;
+    playing = !playing;
+    updatePlayBtn();
+    return;
+  }
   if (!playing && playTime >= tMax) {
     playTime = tMin - 1e-3; // replay the whole story, t=tMin beats included
     rebuildState(tl.events, playTime);
@@ -1326,6 +1470,11 @@ playBtn.addEventListener('click', () => {
 
 scrubber.addEventListener('input', () => {
   if (!tl) return;
+  if (sandbox.active) {
+    playTime = tMin + (parseFloat(scrubber.value) / 1000) * (sbEnd - tMin);
+    sats.forEach(sat => { sat.trailPts = []; sat.trailLine.geometry.setDrawRange(0, 0); });
+    return;
+  }
   const frac = parseFloat(scrubber.value) / 1000;
   const newT = tMin + frac * (tMax - tMin);
   const wasPlaying = playing;
@@ -1343,7 +1492,7 @@ scrubber.addEventListener('input', () => {
   playTime = newT;
 
   sats.forEach((sat, id) => {
-    const pos = interpolatePos(tl!.frames, id, playTime);
+    const pos = positionAt(id, playTime);
     if (pos) { sat.mesh.position.copy(pos); sat.trailPts = []; sat.trailLine.geometry.setDrawRange(0, 0); }
   });
   updatePhaseBadge(); updateTimeDsp();
@@ -1367,11 +1516,7 @@ speedSel.addEventListener('change', () => { speed = parseFloat(speedSel.value); 
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape' && card.classList.contains('visible')) close();
   });
-  // First visit: explain before playing. Never in recording/autoplay modes.
-  let seen = false;
-  try { seen = !!localStorage.getItem('row-intro-seen'); } catch { seen = true; }
-  const p = new URLSearchParams(location.search);
-  if (!seen && !p.has('clean') && !p.has('autoplay')) open();
+  document.getElementById('launcher-howto')?.addEventListener('click', open);
 }
 
 const storyBtn = document.getElementById('story-btn');
@@ -1416,6 +1561,7 @@ document.getElementById('live-btn')?.addEventListener('click', async e => {
       const resp = await fetch(`${API}/run?topology=hierarchical`, { method: 'POST' });
       if (!resp.ok) throw new Error(`API ${resp.status}: ${await resp.text()}`);
       const data = await resp.json() as Timeline;
+      scenarioKey = 'custom';
       loadTimeline(data);
       playing = true;
       updatePlayBtn();
@@ -1469,7 +1615,7 @@ window.addEventListener('drop', e => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    try { loadTimeline(JSON.parse(ev.target!.result as string) as Timeline); }
+    try { scenarioKey = 'custom'; loadTimeline(JSON.parse(ev.target!.result as string) as Timeline); }
     catch { alert('Invalid Timeline JSON — check the console.'); }
   };
   reader.readAsText(file);
@@ -1546,28 +1692,308 @@ document.querySelectorAll<HTMLElement>('.sat-group-btn').forEach(btn => {
   });
 });
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
-// Load the bundled demo run; fall back to the legacy fixture name.
-// URL params for recording clips: ?clean hides the operator chrome,
-// ?autoplay starts the story on load.
-// ?timeline=forced-trade loads ./timeline-forced-trade.json (etc.).
-const bootParams = new URLSearchParams(location.search);
-if (bootParams.has('clean')) document.body.classList.add('clean');
-const tlName = bootParams.get('timeline');
-const tlFile = tlName ? `./timeline-${tlName}.json` : './timeline.json';
-fetch(tlFile)
-  .then(r => (r.ok ? r.json() : fetch('./sample_timeline.json').then(r2 => r2.json())))
-  .then((data: Timeline) => {
+// ── "Your move" sandbox ──────────────────────────────────────────────────────
+let sbEnd = 1;              // sandbox clock runs to here (past tMax if a new risk lies beyond)
+let sbPaths: THREE.Line[] = [];
+let sbArrow: THREE.ArrowHelper | null = null;
+let scenarioKey = 'aeolus';
+
+function pathLine(tr: Trajectory, t0: number, t1: number, color: number, opts: { dashed?: boolean; opacity?: number } = {}) {
+  const pts: THREE.Vector3[] = [];
+  const n = 160;
+  for (let i = 0; i <= n; i++) {
+    const t = t0 + ((t1 - t0) * i) / n;
+    pts.push(new THREE.Vector3(...tr.stateAt(t).r).multiplyScalar(S));
+  }
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = opts.dashed
+    ? new THREE.LineDashedMaterial({ color, dashSize: 0.012, gapSize: 0.01, transparent: true, opacity: opts.opacity ?? 0.8 })
+    : new THREE.LineBasicMaterial({ color, transparent: true, opacity: opts.opacity ?? 0.95 });
+  const line = new THREE.Line(g, mat);
+  if (opts.dashed) line.computeLineDistances();
+  scene.add(line);
+  return line;
+}
+
+function clearSandboxOverlays() {
+  sbPaths.forEach(l => { scene.remove(l); l.geometry.dispose(); });
+  sbPaths = [];
+  if (sbArrow) {
+    sbArrow.traverse(o => {
+      const el = o as unknown as { isCSS2DObject?: boolean; element?: HTMLElement };
+      if (el.isCSS2DObject && el.element) el.element.remove();
+    });
+    scene.remove(sbArrow);
+    sbArrow = null;
+  }
+}
+
+const VERDICT_COLOR: Record<string, string> = {
+  clear: '#3ddc97', new: '#ffb03a', collide: '#ff5a64', fuel: '#ff5a64', none: '#ff5a64',
+};
+
+function onSandboxResult(r: SandboxResult) {
+  sandboxTrajs = r.trajs;
+  const thr = (tl?.meta['conjunction_threshold_km'] as number) ?? 5;
+  const burned = r.verdict !== 'none' && r.verdict !== 'fuel';
+  sbEnd = Math.max(tMax, r.newRisk ? r.newRisk.ap.tca + 60 : 0);
+
+  // 3D: the mover's original path (dashed red) vs its new one, from the burn on
+  clearSandboxOverlays();
+  const tEnd = Math.min(sbEnd, Math.max(r.original.tca, r.pair.tca) + 120);
+  const tStart = r.burn.t;
+  sbPaths.push(pathLine(r.baseline.get(r.mover)!, tStart, tEnd, 0xff4d5e, { dashed: true, opacity: 0.75 }));
+  sbPaths.push(pathLine(r.baseline.get(r.partner)!, tStart, tEnd, 0x58c7ff, { opacity: 0.45 }));
+  if (burned) {
+    const col = new THREE.Color(VERDICT_COLOR[r.verdict]).getHex();
+    sbPaths.push(pathLine(r.trajs.get(r.mover)!, tStart, tEnd, col));
+    const at = new THREE.Vector3(...r.baseline.get(r.mover)!.stateAt(r.burn.t).r).multiplyScalar(S);
+    const dir = new THREE.Vector3(...r.burn.dv).normalize();
+    sbArrow = new THREE.ArrowHelper(dir, at, 0.14, 0xffaa00, 0.03, 0.014);
+    const div = document.createElement('div');
+    div.className = 'burn-label';
+    div.textContent = `▲ ${r.dvMs.toFixed(1)} m/s — your burn`;
+    const lab = new CSS2DObject(div);
+    lab.position.copy(dir.clone().multiplyScalar(0.17));
+    sbArrow.add(lab);
+    scene.add(sbArrow);
+  }
+
+  // colors: pair glows red until the referee approves
+  isResolved = r.verdict === 'clear';
+  activeConjs = isResolved ? [] : [{ aId: r.mover, bId: r.partner, miss: r.pair.miss }];
+  phaseBadge.className = isResolved ? '' : 'danger';
+  phaseText.textContent = isResolved ? 'YOUR MOVE — REFEREE APPROVES' : 'YOUR MOVE — NOT CLEAR YET';
+
+  // chart: no-burn forecast vs your burn (+ any new near-miss you created)
+  const series: Series[] = [];
+  const [a, b] = [r.mover, r.partner];
+  const base = sepFn(r.baseline.get(a)!, r.baseline.get(b)!);
+  series.push({
+    key: 'base', color: 'rgba(255,90,100,0.9)', dashed: true,
+    points: sampleSeparation(base, tMin, sbEnd, [r.original.tca]),
+    minLabel: `${r.original.miss.toFixed(2)} km if nobody moves`,
+  });
+  const legend = [{ color: 'rgba(255,90,100,0.9)', dashed: true, label: 'nobody moves' }];
+  if (burned) {
+    const col = VERDICT_COLOR[r.verdict === 'new' ? 'clear' : r.verdict];
+    series.push({
+      key: 'you', color: col, width: 2.2,
+      points: sampleSeparation(sepFn(r.trajs.get(a)!, r.trajs.get(b)!), tMin, sbEnd, [r.pair.tca]),
+      minLabel: `${r.pair.miss.toFixed(2)} km with your burn`,
+    });
+    legend.push({ color: col, dashed: false, label: `${a} ↔ ${b}, your burn` });
+    if (r.newRisk) {
+      const nr = r.newRisk;
+      series.push({
+        key: 'new', color: '#ffb03a', width: 2,
+        points: sampleSeparation(sepFn(r.trajs.get(a)!, r.trajs.get(nr.id)!), tMin, sbEnd, [nr.ap.tca]),
+        minLabel: `${nr.ap.miss.toFixed(2)} km — new near-miss`,
+      });
+      legend.push({ color: '#ffb03a', dashed: false, label: `${a} ↔ ${nr.id}` });
+    }
+  }
+  approachChart.set(series, tMin, sbEnd, thr);
+  approachLegend.innerHTML = legendHtml(legend);
+  approachTitle.textContent = 'YOUR BURN vs. NOBODY MOVING';
+  readoutPair = [a, b];
+}
+
+const sandbox = new Sandbox({
+  onResult: onSandboxResult,
+  onFly: () => {
+    playTime = tMin;
+    playing = true;
+    userDrove = false;
+    sats.forEach(sat => { sat.trailPts = []; sat.trailLine.geometry.setDrawRange(0, 0); });
+    updatePlayBtn();
+  },
+  onExit: () => exitSandbox(true),
+});
+
+function enterSandbox(preset?: string | null) {
+  if (!tl || !trajs.size) return;
+  playing = false;
+  updatePlayBtn();
+  flushNarration();
+  resetCaptions();
+  clearAllConj(); clearProposal(); clearAllArrows(); clearResolvedLabels();
+  outcomeCard.classList.remove('visible');
+  closeLauncher();
+  if (!sandbox.open(tl, scenarioKey, preset)) return;
+  const r = sandbox.result!;
+  playTime = Math.max(tMin, r.original.tca - 90);
+  focusPair = [r.mover, r.partner];
+  returnHome = false;
+  userDrove = false;
+  sats.forEach(sat => { sat.trailPts = []; sat.trailLine.geometry.setDrawRange(0, 0); });
+  if (speed > 30) { speed = 30; speedSel.value = '30'; }
+}
+
+function exitSandbox(rebuild: boolean) {
+  sandbox.close();
+  sandboxTrajs = null;
+  clearSandboxOverlays();
+  isResolved = false;
+  activeConjs = [];
+  playing = false;
+  updatePlayBtn();
+  if (rebuild && tl) {
+    buildStoryChart(tl);
+    playTime = tMin - 1e-3;
+    rebuildState(tl.events, playTime);
+    scrubber.value = '0';
+    focusPair = null;
+    returnHome = true;
+    updatePhaseBadge();
+  }
+}
+
+document.getElementById('try-btn')?.addEventListener('click', () => enterSandbox());
+document.getElementById('outcome-try')?.addEventListener('click', () => enterSandbox());
+
+// ── Mission launcher ──────────────────────────────────────────────────────────
+interface Mission { key: string; kicker: string; title: string; body: string; color: string; }
+const MISSIONS: Mission[] = [
+  {
+    key: 'aeolus', kicker: 'REAL INCIDENT · SEPT 2019', color: '#ffcc66',
+    title: 'The email dodge',
+    body: 'ESA’s €480M Aeolus and Starlink-44 on a sub-kilometre course. In 2019 the operators coordinated by email, and one side never answered. Here, the agents run the negotiation.',
+  },
+  {
+    key: 'liar', kicker: 'ADVERSARIAL', color: '#ff6b6b',
+    title: 'The lying satellite',
+    body: 'A low-priority agent with a full tank claims it can’t move, so the other side eats the cost. Its partner falls for it. The referee checks the tank and doesn’t.',
+  },
+  {
+    key: 'forced-trade', kicker: 'CHAIN REACTION', color: '#c792ea',
+    title: 'The forced trade',
+    body: 'The satellite that should yield is out of fuel, so the high-priority one has to move. Its dodge sets up a second near-miss, and they go back to the table.',
+  },
+  {
+    key: 'live', kicker: 'REAL CONJUNCTION · JUL 2026', color: '#3ddc97',
+    title: 'Starlink vs. a dead nanosat',
+    body: 'A real predicted close approach from CelesTrak SOCRATES: STARLINK-3068 and VELOX-I, a defunct Singaporean cubesat that cannot move.',
+  },
+];
+
+const launcher = document.getElementById('launcher')!;
+const missionGrid = document.getElementById('mission-grid')!;
+const runCache = new Map<string, Promise<Timeline>>();
+
+function fetchRun(key: string): Promise<Timeline> {
+  if (!runCache.has(key)) {
+    const url = key === 'local' ? './timeline.json' : `./runs/${key}.json`;
+    runCache.set(key, fetch(url).then(r => {
+      if (!r.ok) throw new Error(`${url}: ${r.status}`);
+      return r.json() as Promise<Timeline>;
+    }));
+  }
+  // hand out a deep copy: loadTimeline mutates events (synthetic safe passes)
+  return runCache.get(key)!.then(d => structuredClone(d));
+}
+
+function missionStats(d: Timeline): string {
+  const c = d.events.find(e => e.type === 'conjunction_detected')?.data;
+  const dv = ((d.meta['total_dv_km_s'] as number) ?? 0) * 1000;
+  const parts: string[] = [];
+  if (c) parts.push(`<b>${(c['miss_distance_km'] as number).toFixed(2)} km</b> predicted miss`);
+  if (c) parts.push(`<b>${(c['rel_speed'] as number).toFixed(1)} km/s</b> closing`);
+  parts.push(`agents spent <b>${dv.toFixed(1)} m/s</b>`);
+  return parts.join(' · ');
+}
+
+function renderLauncher() {
+  missionGrid.innerHTML = '';
+  for (const m of MISSIONS) {
+    const card = document.createElement('div');
+    card.className = 'mission';
+    card.style.setProperty('--m-color', m.color);
+    let best = '';
+    try {
+      const b = localStorage.getItem(`row-best-${m.key}`);
+      if (b) best = `<div class="mission-best">⚖ your best dodge: ${Number(b).toFixed(1)} m/s</div>`;
+    } catch { /* storage unavailable */ }
+    card.innerHTML = `
+      <div class="mission-kicker">${m.kicker}</div>
+      <div class="mission-title">${m.title}</div>
+      <div class="mission-body">${m.body}</div>
+      <div class="mission-stats">…</div>
+      ${best}
+      <div class="mission-actions">
+        <button class="m-watch">▶ WATCH THE AGENTS</button>
+        <button class="m-try">⚖ YOUR MOVE</button>
+      </div>`;
+    fetchRun(m.key).then(d => { card.querySelector('.mission-stats')!.innerHTML = missionStats(d); })
+      .catch(() => { card.querySelector('.mission-stats')!.textContent = ''; });
+    card.querySelector('.m-watch')!.addEventListener('click', () => startMission(m.key, 'watch'));
+    card.querySelector('.m-try')!.addEventListener('click', () => startMission(m.key, 'try'));
+    missionGrid.appendChild(card);
+  }
+}
+
+function openLauncher() {
+  playing = false;
+  updatePlayBtn();
+  renderLauncher();
+  launcher.classList.add('visible');
+}
+function closeLauncher() { launcher.classList.remove('visible'); }
+
+async function startMission(key: string, how: 'watch' | 'try' | 'idle', preset?: string | null) {
+  closeLauncher();
+  try {
+    const data = await fetchRun(key);
+    scenarioKey = key;
     loadTimeline(data);
-    if (bootParams.has('autoplay')) {
+    const url = new URL(location.href);
+    url.searchParams.set('timeline', key);
+    if (!preset) url.searchParams.delete('try');
+    history.replaceState(null, '', url);
+    if (how === 'watch') {
       playing = true;
       dismissStickyCaption();
       updatePlayBtn();
+    } else if (how === 'try') {
+      enterSandbox(preset);
     }
-  })
-  .catch(err => {
-    subtitleEl.textContent = 'Drop a timeline JSON to begin';
-    console.warn('timeline.json not loaded:', err);
+  } catch (err) {
+    subtitleEl.textContent = 'Could not load that run — drop a timeline JSON to begin';
+    console.warn(err);
+  }
+}
+
+document.getElementById('missions-btn')?.addEventListener('click', openLauncher);
+document.getElementById('launcher-close')?.addEventListener('click', closeLauncher);
+document.getElementById('outcome-missions')?.addEventListener('click', () => {
+  outcomeCard.classList.remove('visible');
+  openLauncher();
+});
+launcher.addEventListener('click', e => { if (e.target === launcher) closeLauncher(); });
+
+window.addEventListener('keydown', e => {
+  const tag = (e.target as HTMLElement).tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if (e.key === ' ') { e.preventDefault(); playBtn.click(); }
+  else if (e.key === 'Escape' && launcher.classList.contains('visible')) closeLauncher();
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+// ?timeline=aeolus|liar|forced-trade|live picks a bundled run (local = the
+// orchestrator's ./timeline.json), ?autoplay starts the story, ?clean hides the
+// chrome for recording, ?try=ID,tBurn,along,radial,cross opens a shared dodge.
+// With no params the mission launcher is the front door.
+const bootParams = new URLSearchParams(location.search);
+if (bootParams.has('clean')) document.body.classList.add('clean');
+{
+  const legacy: Record<string, string> = { '': 'aeolus' };
+  const asked = bootParams.get('timeline');
+  const key = asked ? (legacy[asked] ?? asked) : 'aeolus';
+  const tryPreset = bootParams.get('try');
+  const how = tryPreset !== null ? 'try' : bootParams.has('autoplay') ? 'watch' : 'idle';
+  startMission(key, how, tryPreset).then(() => {
+    if (!asked && how === 'idle' && !bootParams.has('clean')) openLauncher();
   });
+}
 
 frame();

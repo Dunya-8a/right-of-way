@@ -18,7 +18,7 @@ Starlink concedes (the dead sat physically can't move) and burns 45 m/s.
 
 > ⚠️ Before posting: re-run `uv run python -m row.orchestrator --scenario live
 > --topology swarm` so the featured conjunction is from *that day*, re-bundle
-> `timeline-live.json`, and update the numbers below. Never claim the sats
+> `web/public/runs/live.json`, and update the numbers below. Never claim the sats
 > "will collide" — say "predicted to pass within X m (CelesTrak SOCRATES)".
 
 ---

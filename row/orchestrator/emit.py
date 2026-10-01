@@ -94,6 +94,13 @@ def build_timeline(
         "epoch": original.epoch,
         "conjunction_threshold_km": original.conjunction_threshold_km,
         "objects": [o.id for o in objs],
+        # per-object capability at epoch — lets the viz's sandbox enforce the
+        # same fuel budgets the referee did
+        "object_info": {
+            o.id: {"type": o.type, "priority": o.priority, "fuel_budget_dv": o.fuel_budget_dv}
+            for o in objs
+        },
+        "screen_window_s": original.screen_window_s,
         "generated_by": "row.orchestrator.run",
     }
     if meta_extra:
