@@ -43,5 +43,13 @@
     "kind": "daily",
     "title": "PRC TEST SPACECRAFT 4 vs. CZ-2F DEB",
     "file": "2026-10-02.json"
+  },
+  {
+    "id": "2026-10-04",
+    "number": 4,
+    "date": "2026-10-04",
+    "kind": "daily",
+    "title": "STARLINK-32035 vs. TRANSPORTER-1 OBJECT Z",
+    "file": "2026-10-04.json"
   }
 ]
