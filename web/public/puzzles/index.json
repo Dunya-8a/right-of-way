@@ -51,5 +51,13 @@
     "kind": "daily",
     "title": "STARLINK-32035 vs. TRANSPORTER-1 OBJECT Z",
     "file": "2026-10-04.json"
+  },
+  {
+    "id": "2026-10-07",
+    "number": 5,
+    "date": "2026-10-07",
+    "kind": "daily",
+    "title": "STARLINK-3793 vs. OKEAN-1",
+    "file": "2026-10-07.json"
   }
 ]
