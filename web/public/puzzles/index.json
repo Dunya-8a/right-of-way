@@ -59,5 +59,13 @@
     "kind": "daily",
     "title": "STARLINK-3793 vs. OKEAN-1",
     "file": "2026-10-07.json"
+  },
+  {
+    "id": "2026-10-08",
+    "number": 6,
+    "date": "2026-10-08",
+    "kind": "daily",
+    "title": "STARLINK-6130 vs. SL-3 DEB",
+    "file": "2026-10-08.json"
   }
 ]
