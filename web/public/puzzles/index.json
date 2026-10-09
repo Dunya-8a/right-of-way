@@ -67,5 +67,13 @@
     "kind": "daily",
     "title": "STARLINK-6130 vs. SL-3 DEB",
     "file": "2026-10-08.json"
+  },
+  {
+    "id": "2026-10-09",
+    "number": 7,
+    "date": "2026-10-09",
+    "kind": "daily",
+    "title": "PRC TEST SPACECRAFT 4 vs. CZ-2F DEB",
+    "file": "2026-10-09.json"
   }
 ]
