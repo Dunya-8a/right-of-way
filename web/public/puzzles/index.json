@@ -83,5 +83,13 @@
     "kind": "daily",
     "title": "STARLINK-4429 vs. COSMOS 2251 DEB",
     "file": "2026-10-10.json"
+  },
+  {
+    "id": "2026-10-11",
+    "number": 9,
+    "date": "2026-10-11",
+    "kind": "daily",
+    "title": "STARLINK-30334 vs. BOTSAT-1",
+    "file": "2026-10-11.json"
   }
 ]
