@@ -91,5 +91,13 @@
     "kind": "daily",
     "title": "STARLINK-30334 vs. BOTSAT-1",
     "file": "2026-10-11.json"
+  },
+  {
+    "id": "2026-10-12",
+    "number": 10,
+    "date": "2026-10-12",
+    "kind": "daily",
+    "title": "STARLINK-3867 vs. FLOCK 4G-2",
+    "file": "2026-10-12.json"
   }
 ]
