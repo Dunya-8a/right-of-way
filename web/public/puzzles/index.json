@@ -99,5 +99,13 @@
     "kind": "daily",
     "title": "STARLINK-3867 vs. FLOCK 4G-2",
     "file": "2026-10-12.json"
+  },
+  {
+    "id": "2026-10-14",
+    "number": 11,
+    "date": "2026-10-14",
+    "kind": "daily",
+    "title": "JILIN-1 GAOFEN 3A vs. STARLINK-5130",
+    "file": "2026-10-14.json"
   }
 ]
