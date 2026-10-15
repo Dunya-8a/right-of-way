@@ -107,5 +107,13 @@
     "kind": "daily",
     "title": "JILIN-1 GAOFEN 3A vs. STARLINK-5130",
     "file": "2026-10-14.json"
+  },
+  {
+    "id": "2026-10-15",
+    "number": 12,
+    "date": "2026-10-15",
+    "kind": "daily",
+    "title": "ZHUHAI-1 OHS-02 vs. STARLINK-5576",
+    "file": "2026-10-15.json"
   }
 ]
