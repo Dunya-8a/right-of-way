@@ -115,5 +115,13 @@
     "kind": "daily",
     "title": "ZHUHAI-1 OHS-02 vs. STARLINK-5576",
     "file": "2026-10-15.json"
+  },
+  {
+    "id": "2026-10-16",
+    "number": 13,
+    "date": "2026-10-16",
+    "kind": "daily",
+    "title": "STARLINK-3369 vs. STARLINK-5014",
+    "file": "2026-10-16.json"
   }
 ]
