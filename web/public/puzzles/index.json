@@ -123,5 +123,13 @@
     "kind": "daily",
     "title": "STARLINK-3369 vs. STARLINK-5014",
     "file": "2026-10-16.json"
+  },
+  {
+    "id": "2026-10-19",
+    "number": 14,
+    "date": "2026-10-19",
+    "kind": "daily",
+    "title": "STARLINK-4187 vs. HYPERFIELD-1A",
+    "file": "2026-10-19.json"
   }
 ]
