@@ -67,8 +67,9 @@ def test_omm_epoch_without_fraction():
     from row.scenario_live import fetch_satrec
 
     rec = json.loads((FIXTURES / "omm_100057.json").read_text())
-    rec[0]["EPOCH"] = "2026-10-22T23:36:04"
-    assert fetch_satrec(100057, json.dumps(rec)).satnum == 100057
+    for epoch in ("2026-10-22T23:36:04", "2026-10-22T23:36:04Z", "2026-10-22T23:36:04.39Z"):
+        rec[0]["EPOCH"] = epoch
+        assert fetch_satrec(100057, json.dumps(rec)).satnum == 100057
 
 
 def test_six_digit_catalog_number_without_omm_raises():

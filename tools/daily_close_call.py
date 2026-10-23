@@ -122,9 +122,9 @@ def main() -> None:
 
     ph = KeplerPhysics()
     chosen = None
-    unbuildable: set[tuple[int, int]] = set()  # a pair that failed to build fails again
+    unbuildable: set[frozenset[int]] = set()  # a pair that failed to build fails again
     for i, c, html in candidates():
-        pair = (c.catnr_a, c.catnr_b)
+        pair = frozenset((c.catnr_a, c.catnr_b))
         if pair in unbuildable:
             continue
         if c.rel_speed_kms < DOCKED_REL_SPEED_KMS:

@@ -145,7 +145,9 @@ def fetch_satrec(catnr: int, gp_text: str | None = None) -> Satrec:
     if not records or not isinstance(records, list):
         raise RuntimeError(f"no OMM returned for CATNR {catnr}: {text[:120]!r}")
     fields = dict(records[0])
-    if "." not in fields["EPOCH"]:  # omm.initialize needs fractional seconds
+    # omm.initialize wants exactly YYYY-MM-DDTHH:MM:SS.ffffff, no zone suffix
+    fields["EPOCH"] = fields["EPOCH"].rstrip("Z")
+    if "." not in fields["EPOCH"]:
         fields["EPOCH"] += ".0"
     sat = Satrec()
     omm.initialize(sat, fields)
