@@ -139,5 +139,13 @@
     "kind": "daily",
     "title": "STARLINK-30218 vs. INNOCUBE (TUBSAT-31)",
     "file": "2026-10-20.json"
+  },
+  {
+    "id": "2026-10-24",
+    "number": 16,
+    "date": "2026-10-24",
+    "kind": "daily",
+    "title": "KSM1-D vs. STARLINK-30499",
+    "file": "2026-10-24.json"
   }
 ]
