@@ -147,5 +147,13 @@
     "kind": "daily",
     "title": "KSM1-D vs. STARLINK-30499",
     "file": "2026-10-24.json"
+  },
+  {
+    "id": "2026-10-25",
+    "number": 17,
+    "date": "2026-10-25",
+    "kind": "daily",
+    "title": "NUSAT-49 (KLARA DAN VON NEUMANN) vs. STARLINK-34358",
+    "file": "2026-10-25.json"
   }
 ]
