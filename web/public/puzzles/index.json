@@ -155,5 +155,13 @@
     "kind": "daily",
     "title": "NUSAT-49 (KLARA DAN VON NEUMANN) vs. STARLINK-34358",
     "file": "2026-10-25.json"
+  },
+  {
+    "id": "2026-10-26",
+    "number": 18,
+    "date": "2026-10-26",
+    "kind": "daily",
+    "title": "PRC TEST SPACECRAFT 4 vs. CZ-2F DEB",
+    "file": "2026-10-26.json"
   }
 ]
