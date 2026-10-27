@@ -163,5 +163,13 @@
     "kind": "daily",
     "title": "PRC TEST SPACECRAFT 4 vs. CZ-2F DEB",
     "file": "2026-10-26.json"
+  },
+  {
+    "id": "2026-10-27",
+    "number": 19,
+    "date": "2026-10-27",
+    "kind": "daily",
+    "title": "STARLINK-4429 vs. COSMOS 1975",
+    "file": "2026-10-27.json"
   }
 ]
