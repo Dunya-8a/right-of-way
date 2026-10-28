@@ -37,6 +37,10 @@ from row.scenario_live import (  # noqa: E402
 
 PUZZLES = ROOT / "web" / "public" / "puzzles"
 
+# Below this relative speed the two objects are docked or flying together (a
+# Soyuz at the ISS fills every row of the SOCRATES table), not crossing paths.
+DOCKED_REL_SPEED_KMS = 0.01
+
 
 def describe(name: str, status: str) -> str:
     """A plain-language label for a catalogued object, from its name + status."""
@@ -65,6 +69,17 @@ def describe(name: str, status: str) -> str:
         if key in n:
             return label
     return "a satellite"
+
+
+def candidates():
+    """(row, conjunction, page) from SOCRATES's top-by-probability table, then,
+    if nothing there was playable, its top-by-closest-approach table: while a
+    vehicle is docked at the ISS the docked pair fills the whole first one."""
+    for url in (SOCRATES_URL, SOCRATES_URL.replace("ORDER=MAXPROB", "ORDER=MINRANGE")):
+        html = _get(url)
+        print(url)
+        for i, c in enumerate(fetch_top_conjunctions(html)):
+            yield i, c, html
 
 
 def agents_brain() -> str:
@@ -105,11 +120,16 @@ def main() -> None:
         print(f"{today}: puzzle already exists — nothing to do")
         return
 
-    html = _get(SOCRATES_URL)
-    conjs = fetch_top_conjunctions(html)
     ph = KeplerPhysics()
     chosen = None
-    for i, c in enumerate(conjs):
+    unbuildable: set[frozenset[int]] = set()  # a pair that failed to build fails again
+    for i, c, html in candidates():
+        pair = frozenset((c.catnr_a, c.catnr_b))
+        if pair in unbuildable:
+            continue
+        if c.rel_speed_kms < DOCKED_REL_SPEED_KMS:
+            print(f"[{i}] {c.name_a} / {c.name_b}: docked or co-orbiting, skipping")
+            continue
         if not (_is_maneuverable(c.name_a, c.status_a) or _is_maneuverable(c.name_b, c.status_b)):
             print(f"[{i}] {c.name_a} / {c.name_b}: neither can steer — skipping")
             continue
@@ -117,6 +137,7 @@ def main() -> None:
             scn = generate_live_scenario(pick=i, html=html)
         except Exception as err:  # e.g. a fresh object with no published TLE yet
             print(f"[{i}] {c.name_a} / {c.name_b}: could not build ({err}) — skipping")
+            unbuildable.add(pair)
             continue
         if not ph.screen_conjunctions(scn, scn.screen_window_s):
             print(f"[{i}] {c.name_a} / {c.name_b}: not re-confirmed with today's TLEs — skipping")
