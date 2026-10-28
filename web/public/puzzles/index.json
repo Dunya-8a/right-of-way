@@ -171,5 +171,13 @@
     "kind": "daily",
     "title": "STARLINK-4429 vs. COSMOS 1975",
     "file": "2026-10-27.json"
+  },
+  {
+    "id": "2026-10-28",
+    "number": 20,
+    "date": "2026-10-28",
+    "kind": "daily",
+    "title": "SDA_1673 vs. METEOR 2-21",
+    "file": "2026-10-28.json"
   }
 ]
