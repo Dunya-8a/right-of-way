@@ -179,5 +179,13 @@
     "kind": "daily",
     "title": "SDA_1673 vs. METEOR 2-21",
     "file": "2026-10-28.json"
+  },
+  {
+    "id": "2026-10-30",
+    "number": 21,
+    "date": "2026-10-30",
+    "kind": "daily",
+    "title": "STARLINK-4490 vs. STARLINK-4572",
+    "file": "2026-10-30.json"
   }
 ]
