@@ -187,5 +187,13 @@
     "kind": "daily",
     "title": "STARLINK-4490 vs. STARLINK-4572",
     "file": "2026-10-30.json"
+  },
+  {
+    "id": "2026-11-10",
+    "number": 22,
+    "date": "2026-11-10",
+    "kind": "daily",
+    "title": "HAWK-7B vs. STARLINK-36482",
+    "file": "2026-11-10.json"
   }
 ]
