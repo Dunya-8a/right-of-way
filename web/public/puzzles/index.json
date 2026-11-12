@@ -195,5 +195,13 @@
     "kind": "daily",
     "title": "HAWK-7B vs. STARLINK-36482",
     "file": "2026-11-10.json"
+  },
+  {
+    "id": "2026-11-12",
+    "number": 23,
+    "date": "2026-11-12",
+    "kind": "daily",
+    "title": "HAWK-7C vs. STARLINK-30331",
+    "file": "2026-11-12.json"
   }
 ]
