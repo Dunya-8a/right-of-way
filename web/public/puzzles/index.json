@@ -203,5 +203,13 @@
     "kind": "daily",
     "title": "HAWK-7C vs. STARLINK-30331",
     "file": "2026-11-12.json"
+  },
+  {
+    "id": "2026-11-14",
+    "number": 24,
+    "date": "2026-11-14",
+    "kind": "daily",
+    "title": "STARLINK-33709 vs. CZ-4C R/B",
+    "file": "2026-11-14.json"
   }
 ]
