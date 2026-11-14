@@ -29,12 +29,14 @@ Network use: two small GET requests to celestrak.org (public, no key). Use
 
 from __future__ import annotations
 
+import json
 import math
 import re
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from sgp4 import omm
 from sgp4.api import Satrec, jday
 
 from .contracts import Scenario, SpaceObject
@@ -43,6 +45,10 @@ SOCRATES_URL = (
     "https://celestrak.org/SOCRATES/table-socrates.php?NAME=,&ORDER=MAXPROB&MAX=20"
 )
 GP_TLE_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR={catnr}&FORMAT=TLE"
+# The TLE format only has room for five-digit catalog numbers, so CelesTrak
+# serves objects numbered 100000 and up in OMM formats only (FORMAT=TLE is 404).
+GP_OMM_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR={catnr}&FORMAT=JSON"
+MAX_TLE_CATNR = 99999
 
 DEFAULT_LEAD_S = 600.0  # seed the scenario this long before the real TCA
 SCREEN_WINDOW_S = 2400
@@ -122,16 +128,46 @@ def fetch_tle(catnr: int, tle_text: str | None = None) -> tuple[str, str, str]:
     return lines[0], lines[1], lines[2]
 
 
+def fetch_satrec(catnr: int, gp_text: str | None = None) -> Satrec:
+    """An SGP4 satellite for a NORAD number: TLE when it fits, OMM JSON otherwise.
+
+    ``gp_text`` is canned CelesTrak output for offline tests: a 3-line TLE, or
+    the OMM JSON array for six-digit catalog numbers.
+    """
+    if catnr <= MAX_TLE_CATNR:
+        _, l1, l2 = fetch_tle(catnr, gp_text)
+        return Satrec.twoline2rv(l1, l2)
+    text = gp_text if gp_text is not None else _get(GP_OMM_URL.format(catnr=catnr))
+    try:
+        records = json.loads(text)
+    except ValueError:
+        records = None
+    if not records or not isinstance(records, list):
+        raise RuntimeError(f"no OMM returned for CATNR {catnr}: {text[:120]!r}")
+    fields = dict(records[0])
+    # omm.initialize wants exactly YYYY-MM-DDTHH:MM:SS.ffffff, no zone suffix
+    fields["EPOCH"] = fields["EPOCH"].rstrip("Z")
+    if "." not in fields["EPOCH"]:
+        fields["EPOCH"] += ".0"
+    sat = Satrec()
+    omm.initialize(sat, fields)
+    return sat
+
+
 def _sgp4_state(line1: str, line2: str, when: datetime) -> tuple[tuple, tuple]:
     """Propagate a TLE to ``when`` (UTC); returns (r_km, v_kms) in TEME."""
-    sat = Satrec.twoline2rv(line1, line2)
+    return _propagate(Satrec.twoline2rv(line1, line2), when)
+
+
+def _propagate(sat: Satrec, when: datetime) -> tuple[tuple, tuple]:
+    """Propagate an SGP4 satellite to ``when`` (UTC); returns (r_km, v_kms) in TEME."""
     jd, fr = jday(
         when.year, when.month, when.day, when.hour, when.minute,
         when.second + when.microsecond / 1e6,
     )
     err, r, v = sat.sgp4(jd, fr)
     if err != 0:
-        raise RuntimeError(f"SGP4 error {err} propagating TLE to {when.isoformat()}")
+        raise RuntimeError(f"SGP4 error {err} propagating to {when.isoformat()}")
     return tuple(r), tuple(v)
 
 
@@ -164,8 +200,7 @@ def generate_live_scenario(
         (conj.catnr_b, conj.name_b, conj.status_b),
     ):
         tle_text = (tle_texts or {}).get(catnr)
-        _, l1, l2 = fetch_tle(catnr, tle_text)
-        r, v = _sgp4_state(l1, l2, epoch_dt)
+        r, v = _propagate(fetch_satrec(catnr, tle_text), epoch_dt)
         movable = _is_maneuverable(name, status)
         objs.append(
             SpaceObject(
