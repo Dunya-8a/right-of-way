@@ -211,5 +211,13 @@
     "kind": "daily",
     "title": "STARLINK-33709 vs. CZ-4C R/B",
     "file": "2026-11-14.json"
+  },
+  {
+    "id": "2026-11-18",
+    "number": 25,
+    "date": "2026-11-18",
+    "kind": "daily",
+    "title": "OBJECT B vs. STARLINK-37569",
+    "file": "2026-11-18.json"
   }
 ]
