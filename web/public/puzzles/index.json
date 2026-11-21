@@ -227,5 +227,13 @@
     "kind": "daily",
     "title": "STARLINK-33978 vs. ICUBE-1",
     "file": "2026-11-19.json"
+  },
+  {
+    "id": "2026-11-21",
+    "number": 27,
+    "date": "2026-11-21",
+    "kind": "daily",
+    "title": "KOMPSAT-3A vs. STARLINK-4471",
+    "file": "2026-11-21.json"
   }
 ]
