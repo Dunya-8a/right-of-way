@@ -235,5 +235,13 @@
     "kind": "daily",
     "title": "KOMPSAT-3A vs. STARLINK-4471",
     "file": "2026-11-21.json"
+  },
+  {
+    "id": "2026-11-22",
+    "number": 28,
+    "date": "2026-11-22",
+    "kind": "daily",
+    "title": "HAWK-2C vs. STARLINK-37503",
+    "file": "2026-11-22.json"
   }
 ]
