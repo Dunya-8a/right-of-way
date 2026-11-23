@@ -243,5 +243,13 @@
     "kind": "daily",
     "title": "HAWK-2C vs. STARLINK-37503",
     "file": "2026-11-22.json"
+  },
+  {
+    "id": "2026-11-23",
+    "number": 29,
+    "date": "2026-11-23",
+    "kind": "daily",
+    "title": "VSP RF C1 vs. STARLINK-35366",
+    "file": "2026-11-23.json"
   }
 ]
